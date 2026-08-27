@@ -32,12 +32,19 @@ from backend.app.schemas.api_endpoint import (
     ApiEndpointListResponse,
     ApiAnalyzeResponse,
 )
+from backend.app.schemas.database_schema import (
+    DatabaseModelListResponse,
+    DatabaseRelationshipListResponse,
+    DatabaseDiagramResponse,
+    DatabaseAnalyzeResponse,
+)
 from backend.app.services.project_service import ProjectService
 from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
 from backend.app.services.parse_service import ParseService
 from backend.app.services.dependency_service import DependencyService
 from backend.app.services.api_service import ApiService
+from backend.app.services.database_service import DatabaseService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -410,3 +417,59 @@ def get_api_by_id(
         api_id=api_id,
         db=db,
     )
+
+
+# =========================================================================
+# Phase 7: Database Structure Analysis Endpoints
+# =========================================================================
+
+@router.post(
+    "/{project_id}/database/analyze",
+    response_model=DatabaseAnalyzeResponse,
+    summary="Analyze database schema and ORM models",
+    description="Detects tables, models, columns, primary/foreign keys, and relationships from SQLAlchemy, Django, and raw SQL schemas.",
+)
+def analyze_project_database(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> DatabaseAnalyzeResponse:
+    return DatabaseService.analyze_database(project_id, db)
+
+
+@router.get(
+    "/{project_id}/database/models",
+    response_model=DatabaseModelListResponse,
+    summary="List database models and table schemas",
+    description="Returns all detected database models, columns, data types, constraints, and relationships.",
+)
+def get_database_models(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> DatabaseModelListResponse:
+    return DatabaseService.get_models(project_id, db)
+
+
+@router.get(
+    "/{project_id}/database/relationships",
+    response_model=DatabaseRelationshipListResponse,
+    summary="List database relationships",
+    description="Returns foreign keys, one-to-one, one-to-many, and many-to-many relationships.",
+)
+def get_database_relationships(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> DatabaseRelationshipListResponse:
+    return DatabaseService.get_relationships(project_id, db)
+
+
+@router.get(
+    "/{project_id}/database/diagram",
+    response_model=DatabaseDiagramResponse,
+    summary="Get Mermaid ER diagram for database schema",
+    description="Generates client-renderable Mermaid ER diagram syntax representing database tables and entity relationships.",
+)
+def get_database_diagram(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> DatabaseDiagramResponse:
+    return DatabaseService.get_diagram(project_id, db)

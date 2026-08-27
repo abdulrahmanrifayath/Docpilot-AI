@@ -18,6 +18,10 @@ import {
   ApiAnalyzeResponse,
   ApiEndpointListResponse,
   ApiEndpoint,
+  DatabaseAnalyzeResponse,
+  DatabaseModelListResponse,
+  DatabaseRelationshipListResponse,
+  DatabaseDiagramResponse,
 } from '../types';
 
 export const projectsApi = {
@@ -180,6 +184,27 @@ export const projectsApi = {
 
   getApiById: async (id: string, apiId: string): Promise<ApiEndpoint> => {
     const response = await apiClient.get<ApiEndpoint>(`/api/v1/projects/${id}/apis/${apiId}`);
+    return response.data;
+  },
+
+  // Phase 7 Database Schema APIs
+  analyzeDatabase: async (id: string): Promise<DatabaseAnalyzeResponse> => {
+    const response = await apiClient.post<DatabaseAnalyzeResponse>(`/api/v1/projects/${id}/database/analyze`);
+    return response.data;
+  },
+
+  getDbModels: async (id: string): Promise<DatabaseModelListResponse> => {
+    const response = await apiClient.get<DatabaseModelListResponse>(`/api/v1/projects/${id}/database/models`);
+    return response.data;
+  },
+
+  getDbRelationships: async (id: string): Promise<DatabaseRelationshipListResponse> => {
+    const response = await apiClient.get<DatabaseRelationshipListResponse>(`/api/v1/projects/${id}/database/relationships`);
+    return response.data;
+  },
+
+  getDbDiagram: async (id: string): Promise<DatabaseDiagramResponse> => {
+    const response = await apiClient.get<DatabaseDiagramResponse>(`/api/v1/projects/${id}/database/diagram`);
     return response.data;
   },
 };

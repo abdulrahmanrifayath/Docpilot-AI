@@ -343,6 +343,84 @@ export interface ApiAnalyzeResponse {
 }
 
 // -------------------------------------------------------------
+// Phase 7: Database Structure & ER Types
+// -------------------------------------------------------------
+
+export interface DatabaseField {
+  name: string;
+  data_type: string;
+  primary_key: boolean;
+  foreign_key?: string | null;
+  nullable: boolean;
+  default?: string | null;
+  unique: boolean;
+  index: boolean;
+  description?: string | null;
+}
+
+export interface DatabaseRelationship {
+  name?: string | null;
+  source_model: string;
+  source_table: string;
+  target_model: string;
+  target_table: string;
+  relationship_type: string;
+  foreign_key?: string | null;
+  back_populates?: string | null;
+  secondary_table?: string | null;
+  confidence: number;
+  cardinality_mermaid: string;
+  description?: string | null;
+  metadata_json: Record<string, any>;
+}
+
+export interface DatabaseModel {
+  id: string;
+  project_id: string;
+  model_name: string;
+  table_name: string;
+  file_path: string;
+  line_number?: number | null;
+  orm_framework: string;
+  docstring?: string | null;
+  fields: DatabaseField[];
+  relationships: DatabaseRelationship[];
+  metadata_json: Record<string, any>;
+  created_at: string;
+}
+
+export interface DatabaseModelListResponse {
+  project_id: string;
+  total_models: number;
+  models: DatabaseModel[];
+  frameworks_count: Record<string, number>;
+}
+
+export interface DatabaseRelationshipListResponse {
+  project_id: string;
+  total_relationships: number;
+  relationships: DatabaseRelationship[];
+  counts_by_type: Record<string, number>;
+}
+
+export interface DatabaseDiagramResponse {
+  project_id: string;
+  mermaid_code: string;
+  total_tables: number;
+  total_relationships: number;
+  models: DatabaseModel[];
+}
+
+export interface DatabaseAnalyzeResponse {
+  project_id: string;
+  status: string;
+  total_models: number;
+  total_relationships: number;
+  duration_ms: number;
+  analyzed_at: string;
+}
+
+// -------------------------------------------------------------
 // System Status Types
 // -------------------------------------------------------------
 

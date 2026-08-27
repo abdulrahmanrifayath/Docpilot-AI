@@ -18,10 +18,12 @@ import { LanguageDistribution } from '../components/projects/LanguageDistributio
 import { CodeEntityInspector } from '../components/code/CodeEntityInspector';
 import { DependencyGraphViewer } from '../components/dependencies/DependencyGraphViewer';
 import { ApiExplorer } from '../components/apis/ApiExplorer';
+import { DatabaseSchemaExplorer } from '../components/database/DatabaseSchemaExplorer';
 import {
   BookOpen,
   GitBranch,
   Globe,
+  Database,
   Bot,
   ExternalLink,
   Calendar,
@@ -69,7 +71,7 @@ export const ProjectDetailsPage: React.FC = () => {
   const [technologies, setTechnologies] = useState<TechnologyDetectionResponse | null>(null);
   const [statistics, setStatistics] = useState<ProjectStatisticsResponse | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'entities' | 'dependencies' | 'apis'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'entities' | 'dependencies' | 'apis' | 'database'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -499,6 +501,18 @@ export const ProjectDetailsPage: React.FC = () => {
             <Globe className="w-4 h-4" />
             API Explorer
           </button>
+
+          <button
+            onClick={() => setActiveTab('database')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'database'
+                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            Database Schema & ER
+          </button>
         </div>
       )}
 
@@ -556,6 +570,11 @@ export const ProjectDetailsPage: React.FC = () => {
       {/* Tab 4: API Explorer */}
       {activeTab === 'apis' && (
         <ApiExplorer projectId={project.id} />
+      )}
+
+      {/* Tab 5: Database Schema & ER */}
+      {activeTab === 'database' && (
+        <DatabaseSchemaExplorer projectId={project.id} />
       )}
     </div>
   );

@@ -59,6 +59,17 @@ from backend.app.schemas.api_endpoint import (
     ApiEndpointListResponse,
     ApiAnalyzeResponse,
 )
+from backend.app.schemas.database_schema import (
+    DatabaseField,
+    DatabaseRelationship,
+    DatabaseModelBase,
+    DatabaseModelResponse,
+    DatabaseModelListResponse,
+    DatabaseRelationshipResponse,
+    DatabaseRelationshipListResponse,
+    DatabaseDiagramResponse,
+    DatabaseAnalyzeResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -108,4 +119,13 @@ __all__ = [
     "ApiEndpointResponse",
     "ApiEndpointListResponse",
     "ApiAnalyzeResponse",
+    "DatabaseField",
+    "DatabaseRelationship",
+    "DatabaseModelBase",
+    "DatabaseModelResponse",
+    "DatabaseModelListResponse",
+    "DatabaseRelationshipResponse",
+    "DatabaseRelationshipListResponse",
+    "DatabaseDiagramResponse",
+    "DatabaseAnalyzeResponse",
 ]
