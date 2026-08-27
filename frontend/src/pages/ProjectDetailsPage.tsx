@@ -16,6 +16,7 @@ import { FileTreeExplorer } from '../components/projects/FileTreeExplorer';
 import { TechStackCard } from '../components/projects/TechStackCard';
 import { LanguageDistribution } from '../components/projects/LanguageDistribution';
 import { CodeEntityInspector } from '../components/code/CodeEntityInspector';
+import { DependencyGraphViewer } from '../components/dependencies/DependencyGraphViewer';
 import {
   BookOpen,
   GitBranch,
@@ -66,7 +67,7 @@ export const ProjectDetailsPage: React.FC = () => {
   const [technologies, setTechnologies] = useState<TechnologyDetectionResponse | null>(null);
   const [statistics, setStatistics] = useState<ProjectStatisticsResponse | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'entities'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'entities' | 'dependencies'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -472,6 +473,18 @@ export const ProjectDetailsPage: React.FC = () => {
             <Code2 className="w-4 h-4" />
             Code Entities (AST Parser)
           </button>
+
+          <button
+            onClick={() => setActiveTab('dependencies')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'dependencies'
+                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <GitBranch className="w-4 h-4" />
+            Dependency Graph (React Flow)
+          </button>
         </div>
       )}
 
@@ -519,6 +532,11 @@ export const ProjectDetailsPage: React.FC = () => {
       {/* Tab 2: Code Entities */}
       {activeTab === 'entities' && (
         <CodeEntityInspector projectId={project.id} />
+      )}
+
+      {/* Tab 3: Dependency Graph (React Flow) */}
+      {activeTab === 'dependencies' && (
+        <DependencyGraphViewer projectId={project.id} />
       )}
     </div>
   );

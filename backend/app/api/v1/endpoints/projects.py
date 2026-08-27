@@ -21,10 +21,17 @@ from backend.app.schemas.entity import (
     ProjectEntitiesResponse,
     ParseResponse,
 )
+from backend.app.schemas.dependency import (
+    DependencyListResponse,
+    DependencyGraphResponse,
+    EntityDependenciesResponse,
+    AnalyzeDependenciesResponse,
+)
 from backend.app.services.project_service import ProjectService
 from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
 from backend.app.services.parse_service import ParseService
+from backend.app.services.dependency_service import DependencyService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -259,3 +266,80 @@ def get_file_entities(
     db: Session = Depends(get_db),
 ) -> FileEntitiesResponse:
     return ParseService.get_file_entities(project_id, file_path, db)
+
+
+# =========================================================================
+# Phase 5: Dependency and Relationship Analysis Endpoints
+# =========================================================================
+
+@router.post(
+    "/{project_id}/dependencies/analyze",
+    response_model=AnalyzeDependenciesResponse,
+    summary="Analyze code dependencies and relationships",
+    description="Detects file imports, module dependencies, class inheritance, function calls, and builds the full dependency graph.",
+)
+def analyze_project_dependencies(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> AnalyzeDependenciesResponse:
+    return DependencyService.analyze_dependencies(project_id, db)
+
+
+@router.get(
+    "/{project_id}/dependencies",
+    response_model=DependencyListResponse,
+    summary="List project dependencies",
+    description="Returns code relationships with optional filtering by relationship_type or internal/external flag.",
+)
+def get_project_dependencies(
+    project_id: str,
+    relationship_type: Optional[str] = Query(None, description="Filter by: IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, USES"),
+    is_internal: Optional[bool] = Query(None, description="Filter by internal/external relationship"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+) -> DependencyListResponse:
+    return DependencyService.get_dependencies(
+        project_id=project_id,
+        db=db,
+        relationship_type=relationship_type,
+        is_internal=is_internal,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/{project_id}/dependencies/graph",
+    response_model=DependencyGraphResponse,
+    summary="Get dependency graph for visualization",
+    description="Returns graph nodes and edges formatted for React Flow with layout positioning.",
+)
+def get_dependency_graph(
+    project_id: str,
+    include_external: bool = Query(True, description="Whether to include third-party package dependencies"),
+    db: Session = Depends(get_db),
+) -> DependencyGraphResponse:
+    return DependencyService.get_dependency_graph(
+        project_id=project_id,
+        db=db,
+        include_external=include_external,
+    )
+
+
+@router.get(
+    "/{project_id}/dependencies/entity/{entity_id}",
+    response_model=EntityDependenciesResponse,
+    summary="Get dependencies for a specific entity",
+    description="Returns incoming and outgoing dependencies for a specific class, function, or file.",
+)
+def get_entity_dependencies(
+    project_id: str,
+    entity_id: str,
+    db: Session = Depends(get_db),
+) -> EntityDependenciesResponse:
+    return DependencyService.get_entity_dependencies(
+        project_id=project_id,
+        entity_id=entity_id,
+        db=db,
+    )

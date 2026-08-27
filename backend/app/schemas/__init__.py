@@ -37,6 +37,18 @@ from backend.app.schemas.entity import (
     ProjectEntitiesResponse,
     ParseResponse,
 )
+from backend.app.schemas.dependency import (
+    RelationshipType,
+    NodeType,
+    NodePosition,
+    GraphNode,
+    GraphEdge,
+    DependencyItem,
+    DependencyListResponse,
+    DependencyGraphResponse,
+    EntityDependenciesResponse,
+    AnalyzeDependenciesResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -68,4 +80,14 @@ __all__ = [
     "FileEntitiesResponse",
     "ProjectEntitiesResponse",
     "ParseResponse",
+    "RelationshipType",
+    "NodeType",
+    "NodePosition",
+    "GraphNode",
+    "GraphEdge",
+    "DependencyItem",
+    "DependencyListResponse",
+    "DependencyGraphResponse",
+    "EntityDependenciesResponse",
+    "AnalyzeDependenciesResponse",
 ]

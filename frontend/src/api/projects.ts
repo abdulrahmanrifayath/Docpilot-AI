@@ -11,6 +11,10 @@ import {
   ProjectEntitiesResponse,
   CodeEntity,
   FileEntitiesResponse,
+  AnalyzeDependenciesResponse,
+  DependencyListResponse,
+  DependencyGraphResponse,
+  EntityDependenciesResponse,
 } from '../types';
 
 export const projectsApi = {
@@ -124,6 +128,34 @@ export const projectsApi = {
 
   getFileEntities: async (id: string, filePath: string): Promise<FileEntitiesResponse> => {
     const response = await apiClient.get<FileEntitiesResponse>(`/api/v1/projects/${id}/files/${filePath}/entities`);
+    return response.data;
+  },
+
+  // Phase 5 Dependency and Relationship APIs
+  analyzeDependencies: async (id: string): Promise<AnalyzeDependenciesResponse> => {
+    const response = await apiClient.post<AnalyzeDependenciesResponse>(`/api/v1/projects/${id}/dependencies/analyze`);
+    return response.data;
+  },
+
+  getDependencies: async (
+    id: string,
+    params?: { relationship_type?: string; is_internal?: boolean; skip?: number; limit?: number }
+  ): Promise<DependencyListResponse> => {
+    const response = await apiClient.get<DependencyListResponse>(`/api/v1/projects/${id}/dependencies`, {
+      params,
+    });
+    return response.data;
+  },
+
+  getDependencyGraph: async (id: string, includeExternal = true): Promise<DependencyGraphResponse> => {
+    const response = await apiClient.get<DependencyGraphResponse>(`/api/v1/projects/${id}/dependencies/graph`, {
+      params: { include_external: includeExternal },
+    });
+    return response.data;
+  },
+
+  getEntityDependencies: async (id: string, entityId: string): Promise<EntityDependenciesResponse> => {
+    const response = await apiClient.get<EntityDependenciesResponse>(`/api/v1/projects/${id}/dependencies/entity/${entityId}`);
     return response.data;
   },
 };

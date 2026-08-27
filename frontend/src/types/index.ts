@@ -184,6 +184,102 @@ export interface ParseResponse {
 }
 
 // -------------------------------------------------------------
+// Phase 5: Dependency & Relationship Types
+// -------------------------------------------------------------
+
+export type RelationshipType =
+  | 'IMPORTS'
+  | 'CALLS'
+  | 'EXTENDS'
+  | 'IMPLEMENTS'
+  | 'DEPENDS_ON'
+  | 'USES';
+
+export type NodeType =
+  | 'file'
+  | 'module'
+  | 'class'
+  | 'function'
+  | 'service'
+  | 'package';
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  file_path?: string | null;
+  line_number?: number | null;
+  is_internal: boolean;
+  position: { x: number; y: number };
+  metadata: Record<string, any>;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship_type: string;
+  confidence: number;
+  is_internal: boolean;
+  label?: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface DependencyItem {
+  id: string;
+  project_id: string;
+  source_id: string;
+  source_name: string;
+  source_type: string;
+  target_id: string;
+  target_name: string;
+  target_type: string;
+  relationship_type: string;
+  confidence: number;
+  is_internal: boolean;
+  file_path?: string | null;
+  line_number?: number | null;
+  metadata_json: Record<string, any>;
+}
+
+export interface DependencyListResponse {
+  project_id: string;
+  total_dependencies: number;
+  dependencies: DependencyItem[];
+  counts_by_type: Record<string, number>;
+}
+
+export interface DependencyGraphResponse {
+  project_id: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  total_nodes: number;
+  total_edges: number;
+  internal_edges_count: number;
+  external_edges_count: number;
+}
+
+export interface EntityDependenciesResponse {
+  entity_id: string;
+  entity_name: string;
+  entity_type: string;
+  incoming_dependencies: DependencyItem[];
+  outgoing_dependencies: DependencyItem[];
+  total_dependencies: number;
+}
+
+export interface AnalyzeDependenciesResponse {
+  project_id: string;
+  status: string;
+  total_nodes: number;
+  total_edges: number;
+  internal_edges: number;
+  external_edges: number;
+  duration_ms: number;
+  analyzed_at: string;
+}
+
+// -------------------------------------------------------------
 // System Status Types
 // -------------------------------------------------------------
 
