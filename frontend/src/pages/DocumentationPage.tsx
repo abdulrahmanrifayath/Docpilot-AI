@@ -1,25 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useProject } from '../context/ProjectContext';
+import { projectsApi } from '../api/projects';
+import { DocumentationListResponse } from '../types';
+import { DocSidebar } from '../components/documentation/DocSidebar';
+import { DocReader } from '../components/documentation/DocReader';
+import { DocGenerateModal } from '../components/documentation/DocGenerateModal';
+import { Button } from '../components/common/Button';
 import { Card } from '../components/common/Card';
-import { Badge } from '../components/common/Badge';
 import {
   BookOpen,
   Sparkles,
-  Code,
+  Info,
+  RefreshCw,
+  FileText,
 } from 'lucide-react';
 
 export const DocumentationPage: React.FC = () => {
   const { activeProject } = useProject();
-  const [selectedDocSection, setSelectedDocSection] = useState('overview');
+  const [docList, setDocList] = useState<DocumentationListResponse | null>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const docSections = [
-    { id: 'overview', title: 'System Overview', badge: 'Auto' },
-    { id: 'onboarding', title: 'Developer Onboarding Guide', badge: 'Guide' },
-    { id: 'architecture', title: 'Component Architecture', badge: 'Core' },
-    { id: 'api_endpoints', title: 'API Endpoints & Contracts', badge: 'REST' },
-    { id: 'data_models', title: 'Data Models & Schemas', badge: 'DB' },
-    { id: 'dependencies', title: 'Third-party Dependencies', badge: 'Deps' },
-  ];
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+
+  const fetchDocs = useCallback(async () => {
+    if (!activeProject) return;
+
+    try {
+      setIsLoading(true);
+      const data = await projectsApi.getDocs(activeProject.id);
+      setDocList(data);
+
+      if (data.documents.length > 0 && !selectedDocId) {
+        setSelectedDocId(data.documents[0].id);
+      } else if (
+        selectedDocId &&
+        !data.documents.some((d) => d.id === selectedDocId) &&
+        data.documents.length > 0
+      ) {
+        setSelectedDocId(data.documents[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load project documentation:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeProject, selectedDocId]);
+
+  useEffect(() => {
+    fetchDocs();
+  }, [fetchDocs]);
+
+  const handleRegenerate = async (docId: string) => {
+    if (!activeProject) return;
+
+    try {
+      setIsRegenerating(true);
+      const updated = await projectsApi.regenerateDoc(activeProject.id, docId);
+
+      setDocList((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          documents: prev.documents.map((d) => (d.id === updated.id ? updated : d)),
+        };
+      });
+    } catch (err) {
+      console.error('Failed to regenerate document:', err);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const selectedDoc = docList?.documents.find((d) => d.id === selectedDocId);
 
   return (
     <div className="space-y-6">
@@ -28,95 +84,106 @@ export const DocumentationPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
             <BookOpen className="w-6 h-6 text-indigo-400" />
-            Software Documentation
+            Documentation Center
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Structured, multi-layer developer documentation generated from code analysis and AST extraction.
+            AI-powered software documentation grounded in repository code, APIs, and database models.
           </p>
         </div>
 
         {activeProject && (
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="md">
-              Target: {activeProject.name}
-            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchDocs}
+              isLoading={isLoading}
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsGenerateModalOpen(true)}
+              leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+            >
+              Generate AI Docs
+            </Button>
           </div>
         )}
       </div>
 
-      {/* Main Documentation Split View */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Left Navigation Tree */}
-        <div className="md:col-span-1 space-y-3">
-          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-            <div className="text-[11px] font-mono uppercase text-slate-500 px-2 py-1">
-              Doc Modules
-            </div>
-            {docSections.map((sec) => (
-              <button
-                key={sec.id}
-                onClick={() => setSelectedDocSection(sec.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  selectedDocSection === sec.id
-                    ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <span>{sec.title}</span>
-                <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400">
-                  {sec.badge}
-                </span>
-              </button>
-            ))}
+      {/* Main Content */}
+      {!activeProject ? (
+        <Card className="p-12 text-center border-dashed">
+          <Info className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-white">No Project Selected</h3>
+          <p className="text-xs text-slate-400 mt-1">
+            Please select or create a project from the project list to view or generate documentation.
+          </p>
+        </Card>
+      ) : isLoading && !docList ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin h-8 w-8 text-indigo-500 border-2 border-current border-t-transparent rounded-full" />
+        </div>
+      ) : docList?.documents.length === 0 ? (
+        <Card className="p-12 text-center border-dashed bg-slate-900/50">
+          <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-white">No Documentation Generated Yet</h3>
+          <p className="text-xs text-slate-400 mt-1.5 max-w-md mx-auto leading-relaxed">
+            DocPilot AI can automatically generate comprehensive project overviews, READMEs, architectural designs, API reference specs, and database documentation for <strong className="text-slate-200">{activeProject.name}</strong>.
+          </p>
+          <div className="mt-5">
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setIsGenerateModalOpen(true)}
+              leftIcon={<Sparkles className="w-4 h-4" />}
+            >
+              Generate AI Documentation
+            </Button>
           </div>
+        </Card>
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-6 min-h-[680px]">
+          {/* Left Sidebar */}
+          <DocSidebar
+            documents={docList?.documents || []}
+            selectedDocId={selectedDocId}
+            onSelectDoc={(id) => setSelectedDocId(id)}
+            selectedType={selectedType}
+            onSelectType={(t) => setSelectedType(t)}
+            searchQuery={searchQuery}
+            onSearchChange={(q) => setSearchQuery(q)}
+            onOpenGenerateModal={() => setIsGenerateModalOpen(true)}
+            countsByType={docList?.counts_by_type || {}}
+          />
 
-          <Card className="p-4 bg-slate-900/40">
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Incremental Generation</span>
+          {/* Right Main Viewer */}
+          {selectedDoc ? (
+            <DocReader
+              doc={selectedDoc}
+              onRegenerate={handleRegenerate}
+              isRegenerating={isRegenerating}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-8 bg-slate-900/50 border border-slate-800 rounded-2xl">
+              <p className="text-xs text-slate-500 font-mono">Select a document from the left to read.</p>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              When code changes occur, DocPilot only re-analyzes modified modules and regenerates affected documentation sections.
-            </p>
-          </Card>
+          )}
         </div>
+      )}
 
-        {/* Right Content Panel */}
-        <div className="md:col-span-3">
-          <Card className="p-8 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-[11px] font-mono text-indigo-400 uppercase">
-                  {activeProject?.name || 'Workspace'} Documentation
-                </span>
-                <h2 className="text-xl font-bold text-white mt-1 capitalize">
-                  {selectedDocSection.replace('_', ' ')}
-                </h2>
-              </div>
-              <Badge variant="neutral">Phase 3 Integration</Badge>
-            </div>
-
-            <div className="prose prose-invert max-w-none text-xs text-slate-300 space-y-4 leading-relaxed">
-              <p>
-                This section will automatically render synthesized developer guides, module summaries, and class-level documentation extracted by the DocPilot parser pipeline.
-              </p>
-
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 font-mono text-xs text-slate-400">
-                <div className="text-indigo-400 font-semibold mb-2 flex items-center gap-2">
-                  <Code className="w-4 h-4" />
-                  Documentation Pipeline Specifications
-                </div>
-                <ul className="list-disc list-inside space-y-1 text-slate-400">
-                  <li>Automated Architecture & Sequence overview generation</li>
-                  <li>Developer Onboarding Guide tailored to stack & dependencies</li>
-                  <li>FastAPI / Express / Django endpoint specifications</li>
-                  <li>SQLAlchemy / Prisma / Mongoose data models</li>
-                </ul>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
+      {/* Generate Modal */}
+      {activeProject && (
+        <DocGenerateModal
+          projectId={activeProject.id}
+          isOpen={isGenerateModalOpen}
+          onClose={() => setIsGenerateModalOpen(false)}
+          onSuccess={fetchDocs}
+        />
+      )}
     </div>
   );
 };

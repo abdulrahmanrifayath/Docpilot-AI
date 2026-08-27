@@ -7,6 +7,7 @@ from backend.app.services.dependency_service import DependencyService
 from backend.app.services.api_service import ApiService
 from backend.app.services.database_service import DatabaseService
 from backend.app.services.knowledge_service import KnowledgeService
+from backend.app.services.documentation_service import DocumentationService
 
 __all__ = [
     "SystemService",
@@ -18,4 +19,5 @@ __all__ = [
     "ApiService",
     "DatabaseService",
     "KnowledgeService",
+    "DocumentationService",
 ]

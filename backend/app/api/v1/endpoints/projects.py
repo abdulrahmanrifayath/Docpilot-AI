@@ -43,6 +43,13 @@ from backend.app.schemas.knowledge_graph import (
     KnowledgeEntityDetail,
     KnowledgeBuildResponse,
 )
+from backend.app.schemas.documentation import (
+    DocumentationResponse,
+    DocumentationListResponse,
+    GenerateDocRequest,
+    DocStatusResponse,
+    DocumentationGenerationResult,
+)
 from backend.app.services.project_service import ProjectService
 from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
@@ -51,6 +58,7 @@ from backend.app.services.dependency_service import DependencyService
 from backend.app.services.api_service import ApiService
 from backend.app.services.database_service import DatabaseService
 from backend.app.services.knowledge_service import KnowledgeService
+from backend.app.services.documentation_service import DocumentationService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -540,3 +548,107 @@ def get_knowledge_entity(
         entity_id=entity_id,
         db=db,
     )
+
+
+# =========================================================================
+# Phase 9: AI Documentation Generation Engine Endpoints
+# =========================================================================
+
+@router.get(
+    "/{project_id}/documentation/status",
+    response_model=DocStatusResponse,
+    summary="Get LLM configuration and documentation generation status",
+    description="Checks whether the LLM provider/key is configured and returns available and generated document types.",
+)
+def get_documentation_status(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> DocStatusResponse:
+    return DocumentationService.get_llm_status(project_id=project_id, db=db)
+
+
+@router.post(
+    "/{project_id}/documentation/generate",
+    response_model=DocumentationGenerationResult,
+    summary="Generate AI-powered project documentation",
+    description="Generates technical documentation (Project Overview, README, Architecture, APIs, Database, Folders, Files, Classes, Functions) using structured analysis.",
+)
+async def generate_project_documentation(
+    project_id: str,
+    data: Optional[GenerateDocRequest] = None,
+    db: Session = Depends(get_db),
+) -> DocumentationGenerationResult:
+    doc_types = data.document_types if data else None
+    force_regen = data.force_regenerate if data else False
+    provider = data.provider if data else None
+    model = data.model if data else None
+
+    return await DocumentationService.generate_documentation(
+        project_id=project_id,
+        db=db,
+        document_types=doc_types,
+        force_regenerate=force_regen,
+        provider=provider,
+        model=model,
+    )
+
+
+@router.get(
+    "/{project_id}/documentation",
+    response_model=DocumentationListResponse,
+    summary="List generated documentation documents",
+    description="Returns all generated documentation files for the project with optional document_type and text query filtering.",
+)
+def list_project_documentation(
+    project_id: str,
+    document_type: Optional[str] = Query(None, description="Filter by document type (e.g. PROJECT_OVERVIEW, README, API_DOCUMENTATION)"),
+    q: Optional[str] = Query(None, description="Search query string across titles and markdown content"),
+    db: Session = Depends(get_db),
+) -> DocumentationListResponse:
+    return DocumentationService.get_project_documentation(
+        project_id=project_id,
+        db=db,
+        document_type=document_type,
+        search_query=q,
+    )
+
+
+@router.get(
+    "/{project_id}/documentation/{document_id}",
+    response_model=DocumentationResponse,
+    summary="Get documentation document by ID",
+    description="Returns markdown content, referenced source entities, and version metadata for a single generated document.",
+)
+def get_documentation_document(
+    project_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+) -> DocumentationResponse:
+    return DocumentationService.get_document_by_id(
+        project_id=project_id,
+        document_id=document_id,
+        db=db,
+    )
+
+
+@router.post(
+    "/{project_id}/documentation/{document_id}/regenerate",
+    response_model=DocumentationResponse,
+    summary="Regenerate a specific documentation document",
+    description="Regenerates markdown content using latest repository facts and increments document version.",
+)
+async def regenerate_documentation_document(
+    project_id: str,
+    document_id: str,
+    provider: Optional[str] = Query(None, description="Optional provider override (e.g. mock, openai)"),
+    model: Optional[str] = Query(None, description="Optional model override"),
+    db: Session = Depends(get_db),
+) -> DocumentationResponse:
+    return await DocumentationService.regenerate_document(
+        project_id=project_id,
+        document_id=document_id,
+        provider=provider,
+        model=model,
+        db=db,
+    )
+

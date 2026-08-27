@@ -37,7 +37,8 @@ def db_session() -> Generator[Session, None, None]:
     yield session
 
     session.close()
-    transaction.rollback()
+    if transaction.is_active:
+        transaction.rollback()
     connection.close()
 
 

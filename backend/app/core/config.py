@@ -32,7 +32,15 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./docpilot.db"
 
-    # AI Configuration
+    # AI / LLM Configuration
+    LLM_PROVIDER: str = "openai"  # openai, gemini, anthropic, ollama, mock, custom
+    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_TEMPERATURE: float = 0.2
+    LLM_MAX_TOKENS: int = 4096
+
+    # Backwards compatibility / provider-specific settings
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4o-mini"

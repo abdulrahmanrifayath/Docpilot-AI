@@ -477,6 +477,66 @@ export interface KnowledgeBuildResponse {
 }
 
 // -------------------------------------------------------------
+// Phase 9: AI Documentation Generation Types
+// -------------------------------------------------------------
+
+export type DocumentType =
+  | 'PROJECT_OVERVIEW'
+  | 'README'
+  | 'ARCHITECTURE_OVERVIEW'
+  | 'API_DOCUMENTATION'
+  | 'DATABASE_DOCUMENTATION'
+  | 'FOLDER_DOC'
+  | 'FILE_DOC'
+  | 'CLASS_DOC'
+  | 'FUNCTION_DOC';
+
+export interface Documentation {
+  id: string;
+  project_id: string;
+  document_type: DocumentType | string;
+  title: string;
+  content: string;
+  source_entities: string[];
+  model: string;
+  version: number;
+  metadata_json: Record<string, any>;
+  generated_at: string;
+  updated_at: string;
+}
+
+export interface DocumentationListResponse {
+  project_id: string;
+  total_documents: number;
+  documents: Documentation[];
+  counts_by_type: Record<string, number>;
+}
+
+export interface GenerateDocRequest {
+  document_types?: string[];
+  force_regenerate?: boolean;
+  provider?: string;
+  model?: string;
+}
+
+export interface DocStatusResponse {
+  llm_configured: boolean;
+  provider: string;
+  model: string;
+  available_doc_types: string[];
+  generated_doc_types: string[];
+  total_generated: number;
+}
+
+export interface DocumentationGenerationResult {
+  project_id: string;
+  status: string;
+  generated_count: number;
+  duration_ms: number;
+  documents: Documentation[];
+}
+
+// -------------------------------------------------------------
 // System Status Types
 // -------------------------------------------------------------
 

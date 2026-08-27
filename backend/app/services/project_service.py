@@ -51,6 +51,24 @@ class ProjectService:
         project = ProjectService.get_by_id(db, project_id)
         # Delete repository files from disk
         RepositoryService.delete_project_storage(project_id)
+
+        # Explicitly clean up related child tables
+        from backend.app.models.code_entity import CodeEntity
+        from backend.app.models.code_relationship import CodeRelationship
+        from backend.app.models.api_endpoint import ApiEndpoint
+        from backend.app.models.database_schema import DbModelRecord, DbRelationshipRecord
+        from backend.app.models.knowledge_graph import KnowledgeNodeRecord, KnowledgeEdgeRecord
+        from backend.app.models.documentation import DocumentationRecord
+
+        db.query(DocumentationRecord).filter(DocumentationRecord.project_id == project_id).delete()
+        db.query(KnowledgeEdgeRecord).filter(KnowledgeEdgeRecord.project_id == project_id).delete()
+        db.query(KnowledgeNodeRecord).filter(KnowledgeNodeRecord.project_id == project_id).delete()
+        db.query(DbRelationshipRecord).filter(DbRelationshipRecord.project_id == project_id).delete()
+        db.query(DbModelRecord).filter(DbModelRecord.project_id == project_id).delete()
+        db.query(ApiEndpoint).filter(ApiEndpoint.project_id == project_id).delete()
+        db.query(CodeRelationship).filter(CodeRelationship.project_id == project_id).delete()
+        db.query(CodeEntity).filter(CodeEntity.project_id == project_id).delete()
+
         db.delete(project)
         db.commit()
         logger.info(f"Project and associated storage deleted with id={project_id}")

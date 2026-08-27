@@ -25,6 +25,11 @@ import {
   KnowledgeBuildResponse,
   KnowledgeGraphResponse,
   KnowledgeEntityDetail,
+  DocStatusResponse,
+  DocumentationGenerationResult,
+  DocumentationListResponse,
+  Documentation,
+  GenerateDocRequest,
 } from '../types';
 
 export const projectsApi = {
@@ -229,6 +234,45 @@ export const projectsApi = {
 
   getKnowledgeEntity: async (id: string, entityId: string): Promise<KnowledgeEntityDetail> => {
     const response = await apiClient.get<KnowledgeEntityDetail>(`/api/v1/projects/${id}/knowledge/entity/${entityId}`);
+    return response.data;
+  },
+
+  // Phase 9 AI Documentation Generation APIs
+  getDocStatus: async (id: string): Promise<DocStatusResponse> => {
+    const response = await apiClient.get<DocStatusResponse>(`/api/v1/projects/${id}/documentation/status`);
+    return response.data;
+  },
+
+  generateDocs: async (id: string, data?: GenerateDocRequest): Promise<DocumentationGenerationResult> => {
+    const response = await apiClient.post<DocumentationGenerationResult>(`/api/v1/projects/${id}/documentation/generate`, data || {});
+    return response.data;
+  },
+
+  getDocs: async (
+    id: string,
+    params?: { document_type?: string; q?: string }
+  ): Promise<DocumentationListResponse> => {
+    const response = await apiClient.get<DocumentationListResponse>(`/api/v1/projects/${id}/documentation`, {
+      params,
+    });
+    return response.data;
+  },
+
+  getDocById: async (id: string, docId: string): Promise<Documentation> => {
+    const response = await apiClient.get<Documentation>(`/api/v1/projects/${id}/documentation/${docId}`);
+    return response.data;
+  },
+
+  regenerateDoc: async (
+    id: string,
+    docId: string,
+    params?: { provider?: string; model?: string }
+  ): Promise<Documentation> => {
+    const response = await apiClient.post<Documentation>(
+      `/api/v1/projects/${id}/documentation/${docId}/regenerate`,
+      {},
+      { params }
+    );
     return response.data;
   },
 };
