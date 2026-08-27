@@ -38,6 +38,11 @@ from backend.app.schemas.database_schema import (
     DatabaseDiagramResponse,
     DatabaseAnalyzeResponse,
 )
+from backend.app.schemas.knowledge_graph import (
+    KnowledgeGraphResponse,
+    KnowledgeEntityDetail,
+    KnowledgeBuildResponse,
+)
 from backend.app.services.project_service import ProjectService
 from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
@@ -45,6 +50,7 @@ from backend.app.services.parse_service import ParseService
 from backend.app.services.dependency_service import DependencyService
 from backend.app.services.api_service import ApiService
 from backend.app.services.database_service import DatabaseService
+from backend.app.services.knowledge_service import KnowledgeService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -473,3 +479,64 @@ def get_database_diagram(
     db: Session = Depends(get_db),
 ) -> DatabaseDiagramResponse:
     return DatabaseService.get_diagram(project_id, db)
+
+
+# =========================================================================
+# Phase 8: Unified Project Knowledge Graph Endpoints
+# =========================================================================
+
+@router.post(
+    "/{project_id}/knowledge/build",
+    response_model=KnowledgeBuildResponse,
+    summary="Build unified project knowledge graph",
+    description="Aggregates and links files, code entities, API endpoints, dependencies, and database models into an interconnected graph.",
+)
+def build_project_knowledge_graph(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> KnowledgeBuildResponse:
+    return KnowledgeService.build_knowledge_graph(project_id, db)
+
+
+@router.get(
+    "/{project_id}/knowledge/graph",
+    response_model=KnowledgeGraphResponse,
+    summary="Get unified knowledge graph",
+    description="Returns knowledge graph nodes and edges with support for category filtering, search queries, depth limits, and focus mode.",
+)
+def get_project_knowledge_graph(
+    project_id: str,
+    categories: Optional[str] = Query(None, description="Comma-separated category filters (e.g. API,DATABASE_TABLE,CLASS)"),
+    focus_node_id: Optional[str] = Query(None, description="Focus on a specific center node and its neighbors"),
+    depth: int = Query(2, ge=1, le=5, description="Search depth for focus node exploration"),
+    q: Optional[str] = Query(None, description="Search query string"),
+    limit: int = Query(500, ge=1, le=2000),
+    db: Session = Depends(get_db),
+) -> KnowledgeGraphResponse:
+    return KnowledgeService.get_knowledge_graph(
+        project_id=project_id,
+        categories=categories,
+        focus_node_id=focus_node_id,
+        depth=depth,
+        search_query=q,
+        limit=limit,
+        db=db,
+    )
+
+
+@router.get(
+    "/{project_id}/knowledge/entity/{entity_id}",
+    response_model=KnowledgeEntityDetail,
+    summary="Get knowledge entity details and multi-hop impact",
+    description="Returns detailed upstream callers, downstream dependencies, connected APIs, and connected database tables for an entity.",
+)
+def get_knowledge_entity(
+    project_id: str,
+    entity_id: str,
+    db: Session = Depends(get_db),
+) -> KnowledgeEntityDetail:
+    return KnowledgeService.get_entity_knowledge(
+        project_id=project_id,
+        entity_id=entity_id,
+        db=db,
+    )

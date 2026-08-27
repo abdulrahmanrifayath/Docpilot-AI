@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { DependencyGraphViewer } from '../components/dependencies/DependencyGraphViewer';
+import { KnowledgeGraphViewer } from '../components/knowledge/KnowledgeGraphViewer';
 import { DatabaseSchemaExplorer } from '../components/database/DatabaseSchemaExplorer';
 import {
   GitBranch,
@@ -66,13 +66,13 @@ export const DiagramsPage: React.FC = () => {
 
       {selectedDiagram === 'architecture' ? (
         activeProject ? (
-          <DependencyGraphViewer projectId={activeProject.id} />
+          <KnowledgeGraphViewer projectId={activeProject.id} />
         ) : (
           <Card className="p-12 text-center border-dashed">
             <Info className="w-8 h-8 text-slate-500 mx-auto mb-2" />
             <h3 className="text-sm font-bold text-white">No Project Selected</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Select or create a project to explore its interactive dependency graph.
+              Select or create a project to explore its interactive knowledge graph.
             </p>
           </Card>
         )

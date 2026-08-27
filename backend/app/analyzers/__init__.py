@@ -6,6 +6,7 @@ from backend.app.analyzers.code_parser import CodeParser
 from backend.app.analyzers.dependency_analyzer import DependencyAnalyzer
 from backend.app.analyzers.api_detector import ApiDetector
 from backend.app.analyzers.database_analyzer import DatabaseAnalyzer
+from backend.app.analyzers.knowledge_builder import KnowledgeBuilder
 
 __all__ = [
     "FileScanner",
@@ -16,4 +17,5 @@ __all__ = [
     "DependencyAnalyzer",
     "ApiDetector",
     "DatabaseAnalyzer",
+    "KnowledgeBuilder",
 ]

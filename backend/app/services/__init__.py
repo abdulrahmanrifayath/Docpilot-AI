@@ -6,6 +6,7 @@ from backend.app.services.parse_service import ParseService
 from backend.app.services.dependency_service import DependencyService
 from backend.app.services.api_service import ApiService
 from backend.app.services.database_service import DatabaseService
+from backend.app.services.knowledge_service import KnowledgeService
 
 __all__ = [
     "SystemService",
@@ -16,4 +17,5 @@ __all__ = [
     "DependencyService",
     "ApiService",
     "DatabaseService",
+    "KnowledgeService",
 ]

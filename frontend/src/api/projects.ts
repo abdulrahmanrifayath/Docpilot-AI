@@ -22,6 +22,9 @@ import {
   DatabaseModelListResponse,
   DatabaseRelationshipListResponse,
   DatabaseDiagramResponse,
+  KnowledgeBuildResponse,
+  KnowledgeGraphResponse,
+  KnowledgeEntityDetail,
 } from '../types';
 
 export const projectsApi = {
@@ -205,6 +208,27 @@ export const projectsApi = {
 
   getDbDiagram: async (id: string): Promise<DatabaseDiagramResponse> => {
     const response = await apiClient.get<DatabaseDiagramResponse>(`/api/v1/projects/${id}/database/diagram`);
+    return response.data;
+  },
+
+  // Phase 8 Unified Knowledge Graph APIs
+  buildKnowledgeGraph: async (id: string): Promise<KnowledgeBuildResponse> => {
+    const response = await apiClient.post<KnowledgeBuildResponse>(`/api/v1/projects/${id}/knowledge/build`);
+    return response.data;
+  },
+
+  getKnowledgeGraph: async (
+    id: string,
+    params?: { categories?: string; focus_node_id?: string; depth?: number; q?: string; limit?: number }
+  ): Promise<KnowledgeGraphResponse> => {
+    const response = await apiClient.get<KnowledgeGraphResponse>(`/api/v1/projects/${id}/knowledge/graph`, {
+      params,
+    });
+    return response.data;
+  },
+
+  getKnowledgeEntity: async (id: string, entityId: string): Promise<KnowledgeEntityDetail> => {
+    const response = await apiClient.get<KnowledgeEntityDetail>(`/api/v1/projects/${id}/knowledge/entity/${entityId}`);
     return response.data;
   },
 };

@@ -421,6 +421,62 @@ export interface DatabaseAnalyzeResponse {
 }
 
 // -------------------------------------------------------------
+// Phase 8: Unified Project Knowledge Graph Types
+// -------------------------------------------------------------
+
+export interface KnowledgeNode {
+  id: string;
+  node_key: string;
+  name: string;
+  category: string;
+  file_path?: string | null;
+  line_number?: number | null;
+  position: { x: number; y: number };
+  metadata: Record<string, any>;
+  in_degree: number;
+  out_degree: number;
+}
+
+export interface KnowledgeEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: string;
+  confidence: number;
+  label?: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface KnowledgeGraphResponse {
+  project_id: string;
+  total_nodes: number;
+  total_edges: number;
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  counts_by_category: Record<string, number>;
+  counts_by_relationship: Record<string, number>;
+}
+
+export interface KnowledgeEntityDetail {
+  node: KnowledgeNode;
+  upstream_callers: KnowledgeNode[];
+  downstream_dependencies: KnowledgeNode[];
+  connected_apis: KnowledgeNode[];
+  connected_database_tables: KnowledgeNode[];
+  parent_file_or_folder?: KnowledgeNode | null;
+}
+
+export interface KnowledgeBuildResponse {
+  project_id: string;
+  status: string;
+  total_nodes: number;
+  total_edges: number;
+  counts_by_category: Record<string, number>;
+  duration_ms: number;
+  built_at: string;
+}
+
+// -------------------------------------------------------------
 // System Status Types
 // -------------------------------------------------------------
 

@@ -70,6 +70,13 @@ from backend.app.schemas.database_schema import (
     DatabaseDiagramResponse,
     DatabaseAnalyzeResponse,
 )
+from backend.app.schemas.knowledge_graph import (
+    KnowledgeNode,
+    KnowledgeEdge,
+    KnowledgeGraphResponse,
+    KnowledgeEntityDetail,
+    KnowledgeBuildResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -128,4 +135,9 @@ __all__ = [
     "DatabaseRelationshipListResponse",
     "DatabaseDiagramResponse",
     "DatabaseAnalyzeResponse",
+    "KnowledgeNode",
+    "KnowledgeEdge",
+    "KnowledgeGraphResponse",
+    "KnowledgeEntityDetail",
+    "KnowledgeBuildResponse",
 ]
