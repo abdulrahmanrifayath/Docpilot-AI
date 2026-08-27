@@ -15,6 +15,9 @@ import {
   DependencyListResponse,
   DependencyGraphResponse,
   EntityDependenciesResponse,
+  ApiAnalyzeResponse,
+  ApiEndpointListResponse,
+  ApiEndpoint,
 } from '../types';
 
 export const projectsApi = {
@@ -156,6 +159,27 @@ export const projectsApi = {
 
   getEntityDependencies: async (id: string, entityId: string): Promise<EntityDependenciesResponse> => {
     const response = await apiClient.get<EntityDependenciesResponse>(`/api/v1/projects/${id}/dependencies/entity/${entityId}`);
+    return response.data;
+  },
+
+  // Phase 6 API Discovery APIs
+  analyzeApis: async (id: string): Promise<ApiAnalyzeResponse> => {
+    const response = await apiClient.post<ApiAnalyzeResponse>(`/api/v1/projects/${id}/apis/analyze`);
+    return response.data;
+  },
+
+  getApis: async (
+    id: string,
+    params?: { method?: string; tag?: string; auth_required?: boolean; skip?: number; limit?: number }
+  ): Promise<ApiEndpointListResponse> => {
+    const response = await apiClient.get<ApiEndpointListResponse>(`/api/v1/projects/${id}/apis`, {
+      params,
+    });
+    return response.data;
+  },
+
+  getApiById: async (id: string, apiId: string): Promise<ApiEndpoint> => {
+    const response = await apiClient.get<ApiEndpoint>(`/api/v1/projects/${id}/apis/${apiId}`);
     return response.data;
   },
 };

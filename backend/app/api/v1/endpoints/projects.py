@@ -27,11 +27,17 @@ from backend.app.schemas.dependency import (
     EntityDependenciesResponse,
     AnalyzeDependenciesResponse,
 )
+from backend.app.schemas.api_endpoint import (
+    ApiEndpointResponse,
+    ApiEndpointListResponse,
+    ApiAnalyzeResponse,
+)
 from backend.app.services.project_service import ProjectService
 from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
 from backend.app.services.parse_service import ParseService
 from backend.app.services.dependency_service import DependencyService
+from backend.app.services.api_service import ApiService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -341,5 +347,66 @@ def get_entity_dependencies(
     return DependencyService.get_entity_dependencies(
         project_id=project_id,
         entity_id=entity_id,
+        db=db,
+    )
+
+
+# =========================================================================
+# Phase 6: Automatic API Discovery Endpoints
+# =========================================================================
+
+@router.post(
+    "/{project_id}/apis/analyze",
+    response_model=ApiAnalyzeResponse,
+    summary="Discover and analyze backend API endpoints",
+    description="Detects routes, methods, handlers, request/response models, auth requirements, and tags from FastAPI, Flask, and Express codebases.",
+)
+def analyze_project_apis(
+    project_id: str,
+    db: Session = Depends(get_db),
+) -> ApiAnalyzeResponse:
+    return ApiService.analyze_apis(project_id, db)
+
+
+@router.get(
+    "/{project_id}/apis",
+    response_model=ApiEndpointListResponse,
+    summary="List detected API endpoints",
+    description="Returns API endpoints with optional filtering by HTTP method, tag, or authentication requirement.",
+)
+def get_project_apis(
+    project_id: str,
+    method: Optional[str] = Query(None, description="Filter by HTTP method: GET, POST, PUT, DELETE, PATCH"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    auth_required: Optional[bool] = Query(None, description="Filter by authentication requirement"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+) -> ApiEndpointListResponse:
+    return ApiService.get_apis(
+        project_id=project_id,
+        db=db,
+        method=method,
+        tag=tag,
+        auth_required=auth_required,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/{project_id}/apis/{api_id}",
+    response_model=ApiEndpointResponse,
+    summary="Get API endpoint details",
+    description="Returns detailed parameter schemas, response models, auth rules, and source location for an individual API route.",
+)
+def get_api_by_id(
+    project_id: str,
+    api_id: str,
+    db: Session = Depends(get_db),
+) -> ApiEndpointResponse:
+    return ApiService.get_api_by_id(
+        project_id=project_id,
+        api_id=api_id,
         db=db,
     )

@@ -280,6 +280,69 @@ export interface AnalyzeDependenciesResponse {
 }
 
 // -------------------------------------------------------------
+// Phase 6: API Discovery Types
+// -------------------------------------------------------------
+
+export interface ApiParameter {
+  name: string;
+  in_location: string;
+  type?: string | null;
+  required: boolean;
+  default?: string | null;
+  description?: string | null;
+}
+
+export interface ApiRequestSchema {
+  parameters: ApiParameter[];
+  body_model?: string | null;
+  content_type?: string | null;
+}
+
+export interface ApiResponseSchema {
+  status_code?: number | null;
+  response_model?: string | null;
+  return_type?: string | null;
+  description?: string | null;
+}
+
+export interface ApiEndpoint {
+  id: string;
+  project_id: string;
+  method: string;
+  path: string;
+  handler_name: string;
+  file_path: string;
+  line_number?: number | null;
+  framework: string;
+  request_schema?: ApiRequestSchema | null;
+  response_schema?: ApiResponseSchema | null;
+  authentication_required: boolean;
+  tags: string[];
+  summary?: string | null;
+  docstring?: string | null;
+  metadata_json: Record<string, any>;
+  created_at: string;
+}
+
+export interface ApiEndpointListResponse {
+  project_id: string;
+  total_apis: number;
+  apis: ApiEndpoint[];
+  methods_count: Record<string, number>;
+  frameworks_count: Record<string, number>;
+}
+
+export interface ApiAnalyzeResponse {
+  project_id: string;
+  status: string;
+  total_apis: number;
+  apis_by_method: Record<string, number>;
+  apis_by_framework: Record<string, number>;
+  duration_ms: number;
+  analyzed_at: string;
+}
+
+// -------------------------------------------------------------
 // System Status Types
 // -------------------------------------------------------------
 

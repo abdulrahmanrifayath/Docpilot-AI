@@ -49,6 +49,16 @@ from backend.app.schemas.dependency import (
     EntityDependenciesResponse,
     AnalyzeDependenciesResponse,
 )
+from backend.app.schemas.api_endpoint import (
+    ApiParameter,
+    ApiRequestSchema,
+    ApiResponseSchema,
+    ApiEndpointBase,
+    ApiEndpointCreate,
+    ApiEndpointResponse,
+    ApiEndpointListResponse,
+    ApiAnalyzeResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -90,4 +100,12 @@ __all__ = [
     "DependencyGraphResponse",
     "EntityDependenciesResponse",
     "AnalyzeDependenciesResponse",
+    "ApiParameter",
+    "ApiRequestSchema",
+    "ApiResponseSchema",
+    "ApiEndpointBase",
+    "ApiEndpointCreate",
+    "ApiEndpointResponse",
+    "ApiEndpointListResponse",
+    "ApiAnalyzeResponse",
 ]

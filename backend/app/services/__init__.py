@@ -4,6 +4,7 @@ from backend.app.services.repository_service import RepositoryService
 from backend.app.services.scan_service import ScanService
 from backend.app.services.parse_service import ParseService
 from backend.app.services.dependency_service import DependencyService
+from backend.app.services.api_service import ApiService
 
 __all__ = [
     "SystemService",
@@ -12,4 +13,5 @@ __all__ = [
     "ScanService",
     "ParseService",
     "DependencyService",
+    "ApiService",
 ]

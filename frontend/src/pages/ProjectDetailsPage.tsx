@@ -17,9 +17,11 @@ import { TechStackCard } from '../components/projects/TechStackCard';
 import { LanguageDistribution } from '../components/projects/LanguageDistribution';
 import { CodeEntityInspector } from '../components/code/CodeEntityInspector';
 import { DependencyGraphViewer } from '../components/dependencies/DependencyGraphViewer';
+import { ApiExplorer } from '../components/apis/ApiExplorer';
 import {
   BookOpen,
   GitBranch,
+  Globe,
   Bot,
   ExternalLink,
   Calendar,
@@ -67,7 +69,7 @@ export const ProjectDetailsPage: React.FC = () => {
   const [technologies, setTechnologies] = useState<TechnologyDetectionResponse | null>(null);
   const [statistics, setStatistics] = useState<ProjectStatisticsResponse | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'entities' | 'dependencies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'entities' | 'dependencies' | 'apis'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -485,6 +487,18 @@ export const ProjectDetailsPage: React.FC = () => {
             <GitBranch className="w-4 h-4" />
             Dependency Graph (React Flow)
           </button>
+
+          <button
+            onClick={() => setActiveTab('apis')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'apis'
+                ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            API Explorer
+          </button>
         </div>
       )}
 
@@ -537,6 +551,11 @@ export const ProjectDetailsPage: React.FC = () => {
       {/* Tab 3: Dependency Graph (React Flow) */}
       {activeTab === 'dependencies' && (
         <DependencyGraphViewer projectId={project.id} />
+      )}
+
+      {/* Tab 4: API Explorer */}
+      {activeTab === 'apis' && (
+        <ApiExplorer projectId={project.id} />
       )}
     </div>
   );
