@@ -23,9 +23,14 @@ class Project(Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     repository_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="pending"
-    )  # "pending", "analyzing", "ready", "error"
+        String(50), nullable=False, default="CREATED"
+    )  # "CREATED", "UPLOADING", "CLONING", "READY", "ANALYZING", "ANALYZED", "FAILED"
+    status_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    last_analyzed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

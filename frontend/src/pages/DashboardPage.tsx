@@ -133,7 +133,7 @@ export const DashboardPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h3 className="text-lg font-bold text-white">{activeProject.name}</h3>
-                    <Badge variant={activeProject.status === 'ready' ? 'success' : 'neutral'} dot>
+                    <Badge variant={activeProject.status === 'READY' ? 'success' : 'neutral'} dot>
                       {activeProject.status}
                     </Badge>
                   </div>
@@ -222,7 +222,7 @@ export const DashboardPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={project.status === 'ready' ? 'success' : 'neutral'} size="sm">
+                      <Badge variant={project.status === 'READY' ? 'success' : 'neutral'} size="sm">
                         {project.status}
                       </Badge>
                       <ArrowRight className="w-4 h-4 text-slate-500" />

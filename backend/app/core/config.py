@@ -42,8 +42,44 @@ class Settings(BaseSettings):
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_db"
     VECTOR_COLLECTION_PREFIX: str = "docpilot_"
 
-    # Repository Storage
+    # Repository Storage & Upload Limits
     REPO_STORAGE_PATH: str = "./storage/repos"
+    MAX_UPLOAD_SIZE_MB: int = 50
+
+    # Ignored directories and files during extraction and file discovery
+    IGNORED_DIRECTORIES: List[str] = [
+        "node_modules",
+        ".git",
+        "__pycache__",
+        "dist",
+        "build",
+        ".venv",
+        "venv",
+        ".next",
+        ".nuxt",
+        ".idea",
+        ".vscode",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "target",
+        "vendor",
+        "bin",
+        "obj",
+        "coverage",
+        ".turbo",
+        ".gradle",
+    ]
+
+    IGNORED_FILES: List[str] = [
+        ".DS_Store",
+        "Thumbs.db",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+        "Pipfile.lock",
+    ]
 
     model_config = SettingsConfigDict(
         env_file=".env",

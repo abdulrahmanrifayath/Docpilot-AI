@@ -1,9 +1,10 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from backend.app.models.project import Project
-from backend.app.schemas.project import ProjectCreate, ProjectUpdate
+from backend.app.schemas.project import ProjectCreate, ProjectUpdate, ProjectStatus
 from backend.app.core.exceptions import NotFoundException
 from backend.app.core.logging import logger
+from backend.app.services.repository_service import RepositoryService
 
 
 class ProjectService:
@@ -25,7 +26,8 @@ class ProjectService:
             description=data.description,
             source_type=data.source_type,
             source_url=data.source_url,
-            status="pending",
+            status=ProjectStatus.CREATED.value,
+            status_message="Project created. Awaiting repository upload or clone.",
         )
         db.add(project)
         db.commit()
@@ -47,6 +49,8 @@ class ProjectService:
     @staticmethod
     def delete(db: Session, project_id: str) -> None:
         project = ProjectService.get_by_id(db, project_id)
+        # Delete repository files from disk
+        RepositoryService.delete_project_storage(project_id)
         db.delete(project)
         db.commit()
-        logger.info(f"Project deleted with id={project_id}")
+        logger.info(f"Project and associated storage deleted with id={project_id}")

@@ -5,6 +5,7 @@ import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { CreateProjectModal } from '../components/projects/CreateProjectModal';
 import { projectsApi } from '../api/projects';
+import { ProjectStatus } from '../types';
 import {
   FolderGit2,
   Plus,
@@ -12,8 +13,29 @@ import {
   Trash2,
   Calendar,
   ArrowRight,
+  Clock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
+const getStatusBadge = (status: ProjectStatus) => {
+  switch (status) {
+    case 'READY':
+      return <Badge variant="success" dot>READY</Badge>;
+    case 'ANALYZED':
+      return <Badge variant="success" dot>ANALYZED</Badge>;
+    case 'UPLOADING':
+      return <Badge variant="warning" dot>UPLOADING</Badge>;
+    case 'CLONING':
+      return <Badge variant="warning" dot>CLONING</Badge>;
+    case 'ANALYZING':
+      return <Badge variant="primary" dot>ANALYZING</Badge>;
+    case 'FAILED':
+      return <Badge variant="danger" dot>FAILED</Badge>;
+    case 'CREATED':
+    default:
+      return <Badge variant="neutral" dot>CREATED</Badge>;
+  }
+};
 
 export const ProjectsPage: React.FC = () => {
   const { projects, refreshProjects, setActiveProject } = useProject();
@@ -33,7 +55,7 @@ export const ProjectsPage: React.FC = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this repository from DocPilot?')) return;
+    if (!window.confirm('Are you sure you want to delete this repository from DocPilot? All extracted files and models will be deleted.')) return;
 
     try {
       setDeletingId(id);
@@ -53,7 +75,7 @@ export const ProjectsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Repositories & Projects</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Manage your analyzed codebases, configure source pipelines, and view documentation status.
+            Manage your ingested software repositories, monitor ingestion status, and view code trees.
           </p>
         </div>
         <Button
@@ -133,29 +155,41 @@ export const ProjectsPage: React.FC = () => {
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
                       <FolderGit2 className="w-4 h-4" />
                     </div>
-                    <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate max-w-[180px]">
+                    <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate max-w-[170px]">
                       {project.name}
                     </h3>
                   </div>
-                  <Badge variant={project.status === 'ready' ? 'success' : 'neutral'} size="sm" dot>
-                    {project.status}
-                  </Badge>
+                  {getStatusBadge(project.status)}
                 </div>
 
                 <p className="text-xs text-slate-400 mt-3 line-clamp-2 leading-relaxed">
                   {project.description || 'No description provided for this repository.'}
                 </p>
+
+                {project.status === 'FAILED' && project.status_message && (
+                  <div className="mt-2.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300 truncate">
+                    {project.status_message}
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 capitalize">
-                    {project.source_type}
-                  </span>
-                  <div className="flex items-center gap-1 text-[11px]">
-                    <Calendar className="w-3 h-3 text-slate-500" />
-                    <span>{new Date(project.created_at).toLocaleDateString()}</span>
+                <div className="flex flex-col gap-1 text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 capitalize">
+                      {project.source_type}
+                    </span>
+                    <span className="flex items-center gap-1 text-slate-500">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </span>
                   </div>
+                  {project.last_analyzed_at && (
+                    <div className="flex items-center gap-1 text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span>Analyzed {new Date(project.last_analyzed_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1">

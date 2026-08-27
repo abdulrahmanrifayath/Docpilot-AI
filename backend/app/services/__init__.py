@@ -1,4 +1,13 @@
 from backend.app.services.system_service import SystemService
 from backend.app.services.project_service import ProjectService
+from backend.app.services.repository_service import RepositoryService
+from backend.app.services.scan_service import ScanService
+from backend.app.services.parse_service import ParseService
 
-__all__ = ["SystemService", "ProjectService"]
+__all__ = [
+    "SystemService",
+    "ProjectService",
+    "RepositoryService",
+    "ScanService",
+    "ParseService",
+]

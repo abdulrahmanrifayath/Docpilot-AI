@@ -6,10 +6,36 @@ from backend.app.schemas.system import (
     VectorDBStatus,
 )
 from backend.app.schemas.project import (
+    ProjectStatus,
     ProjectBase,
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
+    CloneRequest,
+    FileItem,
+    FileTreeResponse,
+)
+from backend.app.schemas.technology import (
+    LanguageStat,
+    FrameworkInfo,
+    InfrastructureInfo,
+    TechnologyDetectionResponse,
+)
+from backend.app.schemas.structure import (
+    StructureItem,
+    ProjectStructureResponse,
+    FileSummaryInfo,
+    ProjectStatisticsResponse,
+    ScanResponse,
+)
+from backend.app.schemas.entity import (
+    EntityType,
+    CodeEntityBase,
+    CodeEntityCreate,
+    CodeEntityResponse,
+    FileEntitiesResponse,
+    ProjectEntitiesResponse,
+    ParseResponse,
 )
 
 __all__ = [
@@ -18,8 +44,28 @@ __all__ = [
     "DatabaseStatus",
     "AIProviderStatus",
     "VectorDBStatus",
+    "ProjectStatus",
     "ProjectBase",
     "ProjectCreate",
     "ProjectUpdate",
     "ProjectResponse",
+    "CloneRequest",
+    "FileItem",
+    "FileTreeResponse",
+    "LanguageStat",
+    "FrameworkInfo",
+    "InfrastructureInfo",
+    "TechnologyDetectionResponse",
+    "StructureItem",
+    "ProjectStructureResponse",
+    "FileSummaryInfo",
+    "ProjectStatisticsResponse",
+    "ScanResponse",
+    "EntityType",
+    "CodeEntityBase",
+    "CodeEntityCreate",
+    "CodeEntityResponse",
+    "FileEntitiesResponse",
+    "ProjectEntitiesResponse",
+    "ParseResponse",
 ]

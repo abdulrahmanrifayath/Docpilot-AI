@@ -30,6 +30,10 @@ ENV/
 *.sqlite
 *.sqlite3
 
+# Storage / Repositories
+storage/
+chroma_db/
+
 # Node / Frontend
 frontend/node_modules/
 frontend/dist/
