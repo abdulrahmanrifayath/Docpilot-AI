@@ -1,0 +1,28 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Node & Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Database & Runtime Data
+backend/data/*.db
+backend/data/vector_store/
+backend/uploads/*.zip
+!backend/uploads/sample_ecommerce_app.zip
+
+# Environment & IDE
+.env
+backend/.env
+.vscode/
+.idea/

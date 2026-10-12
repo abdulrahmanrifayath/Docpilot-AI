@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  docpilot-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docpilot-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DATABASE_URL=sqlite+aiosqlite:///./data/docpilot.db
+      - LLM_PROVIDER=openai
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=gpt-4o-mini
+    volumes:
+      - docpilot-data:/app/backend/data
+      - docpilot-uploads:/app/backend/uploads
+    restart: unless-stopped
+
+volumes:
+  docpilot-data:
+  docpilot-uploads:
