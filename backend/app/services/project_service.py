@@ -62,7 +62,10 @@ from app.schemas.project import (
     KnowledgeBuildResponse,
     KnowledgeGraphResponse,
     KnowledgeEntityDetailResponse,
+    DocumentResponse,
+    DocumentGenerateResponse,
 )
+from app.services.documentation_service import documentation_service
 from app.services.repository_scanner import repository_scanner
 
 
@@ -1348,7 +1351,67 @@ class ProjectService:
             db=db,
         )
 
+    # -------------------------------------------------------------------------
+    # Phase 9: AI Documentation Generation Engine
+    # -------------------------------------------------------------------------
+    async def generate_documentation(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        document_types: Optional[List[str]] = None,
+        target_path: Optional[str] = None,
+        target_entity_id: Optional[str] = None,
+        force_regenerate: bool = False,
+    ) -> DocumentGenerateResponse:
+        return await documentation_service.generate_documentation(
+            project_id=project_id,
+            db=db,
+            document_types=document_types,
+            target_path=target_path,
+            target_entity_id=target_entity_id,
+            force_regenerate=force_regenerate,
+        )
+
+    async def get_documents(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        document_type: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[DocumentResponse]:
+        return await documentation_service.get_documents(
+            project_id=project_id,
+            db=db,
+            document_type=document_type,
+            search=search,
+        )
+
+    async def get_document_by_id(
+        self,
+        project_id: str,
+        document_id: str,
+        db: AsyncSession,
+    ) -> DocumentResponse:
+        return await documentation_service.get_document_by_id(
+            project_id=project_id,
+            document_id=document_id,
+            db=db,
+        )
+
+    async def regenerate_document(
+        self,
+        project_id: str,
+        document_id: str,
+        db: AsyncSession,
+    ) -> DocumentResponse:
+        return await documentation_service.regenerate_document(
+            project_id=project_id,
+            document_id=document_id,
+            db=db,
+        )
+
 
 project_service = ProjectService()
+
 
 

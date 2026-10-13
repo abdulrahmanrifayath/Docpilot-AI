@@ -362,16 +362,36 @@ export interface RepositoryStats {
   models: number;
 }
 
+export type DocumentationType =
+  | 'PROJECT_OVERVIEW'
+  | 'README'
+  | 'ARCHITECTURE_OVERVIEW'
+  | 'API_DOCS'
+  | 'DATABASE_DOCS'
+  | 'FOLDER_DOCS'
+  | 'FILE_DOCS'
+  | 'CLASS_DOCS'
+  | 'FUNCTION_DOCS'
+  | string;
+
 export interface DocumentItem {
   id: string;
-  repository_id: string;
-  project_id?: string;
-  doc_type: 'readme' | 'api' | 'architecture' | 'onboarding' | 'report';
+  project_id: string;
+  repository_id?: string;
+  document_type: DocumentationType;
+  doc_type?: string;
   title: string;
   content: string;
-  metadata_json: Record<string, any>;
-  created_at: string;
-  updated_at: string;
+  target_path?: string | null;
+  target_entity_id?: string | null;
+  source_entities?: string[];
+  model?: string | null;
+  version?: number;
+  generated_at?: string;
+  metadata_json?: Record<string, any>;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DiagramItem {
@@ -512,5 +532,25 @@ export interface KnowledgeEntityDetailResponse {
   neighborhood_nodes: KnowledgeNode[];
   neighborhood_edges: KnowledgeEdge[];
 }
+
+// =============================================================================
+// PHASE 9: AI DOCUMENTATION GENERATION TYPES
+// =============================================================================
+
+export interface DocumentGeneratePayload {
+  document_types?: string[];
+  target_path?: string;
+  target_entity_id?: string;
+  force_regenerate?: boolean;
+}
+
+export interface DocumentGenerateResponse {
+  status: string;
+  project_id: string;
+  total_generated: number;
+  documents: DocumentItem[];
+  message?: string;
+}
+
 
 

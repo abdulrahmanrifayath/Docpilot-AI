@@ -380,6 +380,48 @@ class KnowledgeEntityDetailResponse(BaseModel):
     neighborhood_edges: List[KnowledgeEdgeResponse] = Field(default_factory=list)
 
 
+# =============================================================================
+# PHASE 9: AI DOCUMENTATION GENERATION SCHEMAS
+# =============================================================================
+
+class DocumentGenerateRequest(BaseModel):
+    document_types: Optional[List[str]] = Field(
+        None,
+        description="List of document types to generate: PROJECT_OVERVIEW, README, FOLDER_DOCS, FILE_DOCS, CLASS_DOCS, FUNCTION_DOCS, API_DOCS, DATABASE_DOCS, ARCHITECTURE_OVERVIEW",
+    )
+    target_path: Optional[str] = Field(None, description="Optional target file or folder path for granular doc")
+    target_entity_id: Optional[str] = Field(None, description="Optional target entity ID (class, function, API)")
+    force_regenerate: bool = Field(False, description="Whether to overwrite existing documents or bump versions")
+
+
+class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    document_type: str = Field(validation_alias=AliasChoices("document_type", "doc_type"))
+    title: str
+    content: str
+    target_path: Optional[str] = None
+    target_entity_id: Optional[str] = None
+    source_entities: List[str] = Field(default_factory=list)
+    model: Optional[str] = None
+    version: int = 1
+    generated_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class DocumentGenerateResponse(BaseModel):
+    status: str
+    project_id: str
+    total_generated: int
+    documents: List[DocumentResponse] = Field(default_factory=list)
+    message: Optional[str] = None
+
+
+
 
 
 

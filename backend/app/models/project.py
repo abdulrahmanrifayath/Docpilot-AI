@@ -234,16 +234,22 @@ class KnowledgeEdge(Base):
 
 
 class Document(Base):
-
     __tablename__ = "documents"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     repository_id = synonym("project_id")
-    doc_type = Column(String(50), nullable=False)  # readme, api, architecture, onboarding, report
+    document_type = Column("doc_type", String(50), nullable=False, default="PROJECT_OVERVIEW", index=True)  # PROJECT_OVERVIEW, README, FOLDER_DOCS, FILE_DOCS, CLASS_DOCS, FUNCTION_DOCS, API_DOCS, DATABASE_DOCS, ARCHITECTURE_OVERVIEW
+    doc_type = synonym("document_type")
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
-    metadata_json = Column(JSON, default=dict)
+    target_path = Column(String(500), nullable=True, index=True)
+    target_entity_id = Column(String(100), nullable=True, index=True)
+    source_entities = Column(JSON, default=list)
+    model = Column(String(100), nullable=True, default="gpt-4o-mini")
+    version = Column(Integer, nullable=False, default=1)
+    generated_at = Column(DateTime, default=utc_now)
+    metadata_json = Column("metadata_json", JSON, default=dict)
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

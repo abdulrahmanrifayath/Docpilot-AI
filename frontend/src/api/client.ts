@@ -27,6 +27,8 @@ import {
   KnowledgeEntityDetailResponse,
   SystemStatus,
   DocumentItem,
+  DocumentGeneratePayload,
+  DocumentGenerateResponse,
   DiagramItem,
   ChatMessage,
   ProviderSettings,
@@ -378,10 +380,87 @@ export async function fetchKnowledgeEntityDetail(
 
 
 
-export async function fetchDocuments(projectId: string): Promise<DocumentItem[]> {
-  const res = await fetch(`${API_V1}/repositories/${projectId}/documents`);
+// =============================================================================
+// PHASE 9: AI DOCUMENTATION GENERATION CLIENT
+// =============================================================================
+
+export async function generateDocumentation(
+  projectId: string,
+  payload?: DocumentGeneratePayload
+): Promise<DocumentGenerateResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const err: any = new Error(
+      errorData.detail?.message ||
+        errorData.error?.message ||
+        errorData.detail ||
+        'Failed to generate documentation'
+    );
+    err.status = res.status;
+    err.data = errorData.detail || errorData.error || errorData;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function fetchProjectDocuments(
+  projectId: string,
+  options?: { document_type?: string; search?: string }
+): Promise<DocumentItem[]> {
+  const params = new URLSearchParams();
+  if (options?.document_type) params.set('document_type', options.document_type);
+  if (options?.search) params.set('search', options.search);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation${query}`);
   if (!res.ok) return [];
   return res.json();
+}
+
+export async function fetchProjectDocument(
+  projectId: string,
+  documentId: string
+): Promise<DocumentItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation/${documentId}`);
+  if (!res.ok) throw new Error('Failed to fetch document detail');
+  return res.json();
+}
+
+export async function regenerateProjectDocument(
+  projectId: string,
+  documentId: string
+): Promise<DocumentItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation/${documentId}/regenerate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const err: any = new Error(
+      errorData.detail?.message ||
+        errorData.error?.message ||
+        errorData.detail ||
+        'Failed to regenerate document'
+    );
+    err.status = res.status;
+    err.data = errorData.detail || errorData.error || errorData;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function fetchDocuments(projectId: string): Promise<DocumentItem[]> {
+  // Primary endpoint with fallback to legacy repositories endpoint
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation`);
+  if (res.ok) return res.json();
+  const legacyRes = await fetch(`${API_V1}/repositories/${projectId}/documents`);
+  if (!legacyRes.ok) return [];
+  return legacyRes.json();
 }
 
 export async function fetchDiagrams(projectId: string): Promise<DiagramItem[]> {

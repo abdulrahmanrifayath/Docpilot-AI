@@ -47,6 +47,22 @@ async def init_db() -> None:
                 existing_cols = {row[1] for row in res.fetchall()}
                 if "infrastructure" not in existing_cols and "id" in existing_cols:
                     await conn.execute(text("ALTER TABLE projects ADD COLUMN infrastructure JSON DEFAULT '[]'"))
+
+                # Documents table Phase 9 columns migration
+                d_res = await conn.execute(text("PRAGMA table_info(documents)"))
+                d_cols = {row[1] for row in d_res.fetchall()}
+                if "target_path" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN target_path VARCHAR(500)"))
+                if "target_entity_id" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN target_entity_id VARCHAR(100)"))
+                if "source_entities" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN source_entities JSON DEFAULT '[]'"))
+                if "model" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN model VARCHAR(100) DEFAULT 'gpt-4o-mini'"))
+                if "version" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN version INTEGER DEFAULT 1"))
+                if "generated_at" not in d_cols and "id" in d_cols:
+                    await conn.execute(text("ALTER TABLE documents ADD COLUMN generated_at TIMESTAMP"))
             except Exception:
                 pass
 

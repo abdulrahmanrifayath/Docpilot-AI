@@ -29,7 +29,11 @@ from app.schemas.project import (
     KnowledgeBuildResponse,
     KnowledgeGraphResponse,
     KnowledgeEntityDetailResponse,
+    DocumentGenerateRequest,
+    DocumentResponse,
+    DocumentGenerateResponse,
 )
+from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
 
 
@@ -432,6 +436,103 @@ async def get_project_knowledge_entity_detail(
         entity_id=entity_id,
         db=db,
     )
+
+
+# =============================================================================
+# PHASE 9: AI DOCUMENTATION GENERATION ENDPOINTS
+# =============================================================================
+
+@router.post("/{project_id}/documentation/generate", response_model=DocumentGenerateResponse)
+async def generate_project_documentation(
+    project_id: str,
+    payload: Optional[DocumentGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentGenerateResponse:
+    """Generate high-quality AI documentation suite from structured repository analysis."""
+    req = payload or DocumentGenerateRequest()
+    try:
+        return await project_service.generate_documentation(
+            project_id=project_id,
+            db=db,
+            document_types=req.document_types,
+            target_path=req.target_path,
+            target_entity_id=req.target_entity_id,
+            force_regenerate=req.force_regenerate,
+        )
+    except LLMNotConfiguredError as ex:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "CONFIGURATION_REQUIRED",
+                "message": str(ex.message),
+                "provider": ex.provider,
+                "is_configured": False,
+            },
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.get("/{project_id}/documentation", response_model=List[DocumentResponse])
+async def list_project_documentation(
+    project_id: str,
+    document_type: Optional[str] = Query(None, description="Filter by document type (e.g. README, API_DOCS, DATABASE_DOCS)"),
+    search: Optional[str] = Query(None, description="Search documentation title or content"),
+    db: AsyncSession = Depends(get_db),
+) -> List[DocumentResponse]:
+    """List all generated technical documents for a project."""
+    await project_service.get_project(project_id, db)
+    return await project_service.get_documents(
+        project_id=project_id,
+        db=db,
+        document_type=document_type,
+        search=search,
+    )
+
+
+@router.get("/{project_id}/documentation/{document_id}", response_model=DocumentResponse)
+async def get_project_document(
+    project_id: str,
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentResponse:
+    """Retrieve full detail of a specific generated technical document."""
+    try:
+        return await project_service.get_document_by_id(
+            project_id=project_id,
+            document_id=document_id,
+            db=db,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.post("/{project_id}/documentation/{document_id}/regenerate", response_model=DocumentResponse)
+async def regenerate_project_document(
+    project_id: str,
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentResponse:
+    """Regenerate a specific document using updated/fresh repository context, bumping version."""
+    try:
+        return await project_service.regenerate_document(
+            project_id=project_id,
+            document_id=document_id,
+            db=db,
+        )
+    except LLMNotConfiguredError as ex:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "CONFIGURATION_REQUIRED",
+                "message": str(ex.message),
+                "provider": ex.provider,
+                "is_configured": False,
+            },
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
 
 
 
