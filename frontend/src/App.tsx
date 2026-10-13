@@ -1,48 +1,104 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Navbar } from './components/Navbar';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ProjectProvider } from './context/ProjectContext';
+import { Layout } from './components/Layout';
+import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { RepositoryDetailPage } from './pages/RepositoryDetailPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
+import { DocumentationPage } from './pages/DocumentationPage';
+import { DiagramsPage } from './pages/DiagramsPage';
+import { AIChatPage } from './pages/AIChatPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { ChatDrawer } from './components/ChatDrawer';
 
 export const App: React.FC = () => {
-  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-  const [activeRepoId, setActiveRepoId] = useState<string | undefined>(undefined);
-  const [activeRepoName, setActiveRepoName] = useState<string | undefined>(undefined);
-
-  const handleOpenChat = (repoId: string, repoName: string) => {
-    setActiveRepoId(repoId);
-    setActiveRepoName(repoName);
-    setIsChatOpen(true);
-  };
-
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col">
-        <Navbar
-          onToggleChat={() => setIsChatOpen(!isChatOpen)}
-          isChatOpen={isChatOpen}
-        />
+      <ProjectProvider>
+        <Routes>
+          {/* Public Landing Page */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/landing" element={<LandingPage />} />
 
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route
-              path="/repository/:id"
-              element={<RepositoryDetailPage onOpenChat={handleOpenChat} />}
-            />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </main>
+          {/* Main Application with Developer Tool Layout (Sidebar + Top Bar) */}
+          <Route
+            path="/dashboard"
+            element={
+              <Layout>
+                <DashboardPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/projects"
+            element={
+              <Layout>
+                <ProjectsPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/projects/:id"
+            element={
+              <Layout>
+                <ProjectDetailsPage />
+              </Layout>
+            }
+          />
+          {/* Legacy route alias */}
+          <Route
+            path="/repository/:id"
+            element={
+              <Layout>
+                <ProjectDetailsPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/documentation"
+            element={
+              <Layout>
+                <DocumentationPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/architecture"
+            element={
+              <Layout>
+                <DiagramsPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/diagrams"
+            element={
+              <Layout>
+                <DiagramsPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <Layout>
+                <AIChatPage />
+              </Layout>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Layout>
+                <SettingsPage />
+              </Layout>
+            }
+          />
 
-        <ChatDrawer
-          isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
-          repositoryId={activeRepoId}
-          repositoryName={activeRepoName}
-        />
-      </div>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ProjectProvider>
     </BrowserRouter>
   );
 };

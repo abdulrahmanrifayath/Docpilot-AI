@@ -21,9 +21,10 @@ const STAGES = [
 ];
 
 export const PipelineStepper: React.FC<PipelineStepperProps> = ({ progress }) => {
-  const currentPercent = progress.progress_percent;
-  const isFailed = progress.status === 'failed';
-  const isCompleted = progress.status === 'completed';
+  const currentPercent = progress.progress_percent ?? 0;
+  const isFailed = progress.status === 'failed' || progress.status === 'FAILED';
+  const isCompleted = progress.status === 'completed' || progress.status === 'READY' || progress.status === 'ANALYZED';
+
 
   // Estimate active step index (0-based) based on percentage
   const activeIndex = Math.min(

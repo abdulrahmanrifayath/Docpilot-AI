@@ -1,3 +1,75 @@
+export type ProjectStatus =
+  | 'CREATED'
+  | 'UPLOADING'
+  | 'CLONING'
+  | 'READY'
+  | 'ANALYZING'
+  | 'ANALYZED'
+  | 'FAILED';
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  source_type: 'zip' | 'git' | 'local';
+  source_url?: string;
+  repository_path: string;
+  status: ProjectStatus;
+  error_message?: string;
+  last_analyzed_at?: string;
+  languages?: Record<string, LanguageStat>;
+  frameworks?: string[];
+  stats?: RepositoryStats;
+  structure?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectCreatePayload {
+  name: string;
+  description?: string;
+  source_type: 'zip' | 'git' | 'local';
+  source_url?: string;
+}
+
+export interface ProjectFileNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  children?: ProjectFileNode[];
+}
+
+export interface ProjectFilesResponse {
+  project_id: string;
+  total_files: number;
+  files: ProjectFileNode[];
+}
+
+export interface SystemStatus {
+  status: 'operational' | 'degraded';
+  application: {
+    status: string;
+    name: string;
+    version: string;
+    environment: string;
+  };
+  database: {
+    status: string;
+    type: string;
+    error?: string;
+  };
+  ai_provider: {
+    provider: string;
+    model: string;
+    is_configured: boolean;
+  };
+  vector_database: {
+    type: string;
+    status: string;
+  };
+}
+
 export interface LanguageStat {
   files: number;
   lines: number;
@@ -13,50 +85,10 @@ export interface RepositoryStats {
   models: number;
 }
 
-export interface StructureTree {
-  name: string;
-  type: 'directory' | 'file';
-  path: string;
-  purpose?: string;
-  size?: number;
-  children?: StructureTree[];
-}
-
-export interface Repository {
-  id: string;
-  name: string;
-  description?: string;
-  source_type: 'zip' | 'git' | 'local';
-  source_url?: string;
-  status: 'pending' | 'analyzing' | 'completed' | 'failed';
-  current_step: string;
-  progress_percent: number;
-  error_message?: string;
-  commit_hash?: string;
-  languages: Record<string, LanguageStat>;
-  frameworks: string[];
-  stats: RepositoryStats;
-  structure: {
-    root_name?: string;
-    tree?: StructureTree;
-    folder_purposes?: Record<string, string>;
-    total_files?: number;
-  };
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PipelineProgress {
-  repository_id: string;
-  status: 'pending' | 'analyzing' | 'completed' | 'failed';
-  current_step: string;
-  progress_percent: number;
-  error_message?: string;
-}
-
 export interface DocumentItem {
   id: string;
   repository_id: string;
+  project_id?: string;
   doc_type: 'readme' | 'api' | 'architecture' | 'onboarding' | 'report';
   title: string;
   content: string;
@@ -68,6 +100,7 @@ export interface DocumentItem {
 export interface DiagramItem {
   id: string;
   repository_id: string;
+  project_id?: string;
   diagram_type: 'architecture' | 'sequence' | 'er' | 'dependency' | 'react_flow';
   title: string;
   mermaid_code?: string;
@@ -89,6 +122,7 @@ export interface Citation {
 export interface ChatMessage {
   id: string;
   repository_id: string;
+  project_id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   sources: Citation[];
@@ -104,12 +138,13 @@ export interface ProviderSettings {
   github_token_configured: boolean;
 }
 
-export interface SyncResult {
+export type Repository = Project;
+
+export interface PipelineProgress {
   repository_id: string;
-  changes_detected: boolean;
-  modified_files: string[];
-  added_files: string[];
-  deleted_files: string[];
-  regenerated_docs: string[];
   status: string;
+  current_step?: string;
+  progress_percent?: number;
+  error_message?: string;
 }
+

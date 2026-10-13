@@ -1,127 +1,127 @@
 import {
-  Repository,
-  PipelineProgress,
+  Project,
+  ProjectCreatePayload,
+  ProjectFilesResponse,
+  SystemStatus,
   DocumentItem,
   DiagramItem,
   ChatMessage,
   ProviderSettings,
-  SyncResult,
 } from '../types';
 
-const API_BASE = '/api';
+const API_V1 = '/api/v1';
 
-export async function fetchRepositories(): Promise<Repository[]> {
-  const res = await fetch(`${API_BASE}/repositories`);
-  if (!res.ok) throw new Error('Failed to fetch repositories');
+export async function fetchSystemStatus(): Promise<SystemStatus> {
+  const res = await fetch(`${API_V1}/system/status`);
+  if (!res.ok) throw new Error('Failed to fetch system status');
   return res.json();
 }
 
-export async function fetchRepository(id: string): Promise<Repository> {
-  const res = await fetch(`${API_BASE}/repositories/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch repository details');
+export async function fetchProjects(): Promise<Project[]> {
+  const res = await fetch(`${API_V1}/projects`);
+  if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
 
-export async function uploadZip(file: File, name?: string): Promise<Repository> {
+export async function fetchProject(id: string): Promise<Project> {
+  const res = await fetch(`${API_V1}/projects/${id}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Project not found' } }));
+    throw new Error(err.error?.message || 'Failed to fetch project');
+  }
+  return res.json();
+}
+
+export async function createProject(payload: ProjectCreatePayload): Promise<Project> {
+  const res = await fetch(`${API_V1}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Failed to create project' } }));
+    throw new Error(err.error?.message || 'Failed to create project');
+  }
+  return res.json();
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const res = await fetch(`${API_V1}/projects/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to delete project');
+}
+
+export async function uploadProjectZip(id: string, file: File): Promise<Project> {
   const formData = new FormData();
   formData.append('file', file);
-  if (name) formData.append('name', name);
 
-  const res = await fetch(`${API_BASE}/repositories/upload`, {
+  const res = await fetch(`${API_V1}/projects/${id}/upload`, {
     method: 'POST',
     body: formData,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
-    throw new Error(err.detail || 'Upload failed');
+    const err = await res.json().catch(() => ({ error: { message: 'Upload failed' } }));
+    throw new Error(err.error?.message || 'Upload failed');
   }
   return res.json();
 }
 
-export async function cloneGit(sourceUrl: string, name?: string): Promise<Repository> {
-  const res = await fetch(`${API_BASE}/repositories/clone`, {
+export async function cloneProjectGit(id: string, sourceUrl?: string): Promise<Project> {
+  const res = await fetch(`${API_V1}/projects/${id}/clone`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source_url: sourceUrl, name }),
+    body: JSON.stringify({ source_url: sourceUrl }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Cloning failed' }));
-    throw new Error(err.detail || 'Cloning failed');
+    const err = await res.json().catch(() => ({ error: { message: 'Clone failed' } }));
+    throw new Error(err.error?.message || 'Clone failed');
   }
   return res.json();
 }
 
-export async function deleteRepository(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/repositories/${id}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error('Failed to delete repository');
-}
-
-export async function fetchProgress(id: string): Promise<PipelineProgress> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/progress`);
-  if (!res.ok) throw new Error('Failed to fetch pipeline progress');
+export async function fetchProjectFiles(id: string): Promise<ProjectFilesResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/files`);
+  if (!res.ok) throw new Error('Failed to fetch project files');
   return res.json();
 }
 
-export async function triggerAnalysis(id: string): Promise<Repository> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/analyze`, {
-    method: 'POST',
-  });
-  if (!res.ok) throw new Error('Failed to start analysis');
+export async function fetchDocuments(projectId: string): Promise<DocumentItem[]> {
+  const res = await fetch(`${API_V1}/repositories/${projectId}/documents`);
+  if (!res.ok) return [];
   return res.json();
 }
 
-export async function fetchDocuments(id: string): Promise<DocumentItem[]> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/documents`);
-  if (!res.ok) throw new Error('Failed to fetch documents');
+export async function fetchDiagrams(projectId: string): Promise<DiagramItem[]> {
+  const res = await fetch(`${API_V1}/repositories/${projectId}/diagrams`);
+  if (!res.ok) return [];
   return res.json();
 }
 
-export async function fetchDocument(id: string, docType: string): Promise<DocumentItem> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/documents/${docType}`);
-  if (!res.ok) throw new Error(`Failed to fetch ${docType} document`);
+export async function fetchChatHistory(projectId: string): Promise<ChatMessage[]> {
+  const res = await fetch(`${API_V1}/repositories/${projectId}/chat`);
+  if (!res.ok) return [];
   return res.json();
 }
 
-export async function fetchDiagrams(id: string): Promise<DiagramItem[]> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/diagrams`);
-  if (!res.ok) throw new Error('Failed to fetch diagrams');
-  return res.json();
-}
-
-export async function fetchChatHistory(id: string): Promise<ChatMessage[]> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/chat`);
-  if (!res.ok) throw new Error('Failed to fetch chat history');
-  return res.json();
-}
-
-export async function sendChatMessage(id: string, content: string): Promise<ChatMessage> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/chat`, {
+export async function sendChatMessage(projectId: string, content: string): Promise<ChatMessage> {
+  const res = await fetch(`${API_V1}/repositories/${projectId}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   });
-  if (!res.ok) throw new Error('Failed to send chat message');
-  return res.json();
-}
-
-export async function syncRepository(id: string): Promise<SyncResult> {
-  const res = await fetch(`${API_BASE}/repositories/${id}/sync`, {
-    method: 'POST',
-  });
-  if (!res.ok) throw new Error('Failed to sync repository');
+  if (!res.ok) throw new Error('Failed to send message');
   return res.json();
 }
 
 export async function fetchSettings(): Promise<ProviderSettings> {
-  const res = await fetch(`${API_BASE}/settings`);
+  const res = await fetch(`${API_V1}/settings`);
   if (!res.ok) throw new Error('Failed to fetch settings');
   return res.json();
 }
 
 export async function updateSettings(payload: any): Promise<ProviderSettings> {
-  const res = await fetch(`${API_BASE}/settings`, {
+  const res = await fetch(`${API_V1}/settings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -129,3 +129,46 @@ export async function updateSettings(payload: any): Promise<ProviderSettings> {
   if (!res.ok) throw new Error('Failed to update settings');
   return res.json();
 }
+
+// Aliases and helpers for backward compatibility
+export const fetchRepositories = fetchProjects;
+export const fetchRepository = fetchProject;
+export const deleteRepository = deleteProject;
+
+export async function uploadZip(file: File, name?: string): Promise<Project> {
+  const proj = await createProject({
+    name: name || file.name.replace(/\.zip$/i, ''),
+    source_type: 'zip',
+  });
+  return uploadProjectZip(proj.id, file);
+}
+
+export async function cloneGit(sourceUrl: string, name?: string): Promise<Project> {
+  const repoName = name || sourceUrl.split('/').pop()?.replace(/\.git$/i, '') || 'git-project';
+  const proj = await createProject({
+    name: repoName,
+    source_type: 'git',
+    source_url: sourceUrl,
+  });
+  return cloneProjectGit(proj.id, sourceUrl);
+}
+
+export async function fetchProgress(id: string): Promise<any> {
+  const proj = await fetchProject(id);
+  return {
+    repository_id: proj.id,
+    status: proj.status,
+    current_step: proj.status,
+    progress_percent: proj.status === 'READY' ? 100 : proj.status === 'FAILED' ? 0 : 50,
+    error_message: proj.error_message,
+  };
+}
+
+export async function syncRepository(id: string): Promise<any> {
+  return fetchProject(id);
+}
+
+export async function triggerAnalysis(id: string): Promise<any> {
+  return fetchProject(id);
+}
+

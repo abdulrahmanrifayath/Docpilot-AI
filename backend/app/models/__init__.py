@@ -1,3 +1,3 @@
-from app.models.repository import Repository, Document, Diagram, ChatMessage
+from app.models.project import Project, Document, Diagram, ChatMessage, Repository
 
-__all__ = ["Repository", "Document", "Diagram", "ChatMessage"]
+__all__ = ["Project", "Document", "Diagram", "ChatMessage", "Repository"]

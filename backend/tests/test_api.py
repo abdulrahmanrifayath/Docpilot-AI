@@ -11,7 +11,7 @@ async def test_health_endpoint():
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert "DocPilot AI" in data["app"]
+        assert data["service"] == "docpilot-ai"
 
 
 @pytest.mark.asyncio
