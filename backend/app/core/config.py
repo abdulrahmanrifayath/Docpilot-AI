@@ -41,6 +41,8 @@ class Settings(BaseSettings):
 
     # File & ZIP Upload limits
     MAX_UPLOAD_SIZE_MB: int = 100
+    MAX_FILE_SIZE_BYTES: int = 2 * 1024 * 1024  # 2MB max source file parse size
+
     IGNORED_DIRECTORIES: List[str] = [
         "node_modules",
         ".git",

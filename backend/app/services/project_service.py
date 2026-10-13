@@ -1,3 +1,4 @@
+import base64
 import os
 import re
 import shutil
@@ -5,9 +6,10 @@ import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote
 from git import Repo
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.core.config import settings
 from app.core.exceptions import (
@@ -18,7 +20,8 @@ from app.core.exceptions import (
     GitCloneException,
 )
 from app.core.logging import logger
-from app.models.project import Project, utc_now
+from app.models.project import Project, CodeEntity, utc_now
+from app.parsers.code_extractor import code_parsing_engine
 from app.schemas.project import (
     ProjectCreate,
     ProjectFileNode,
@@ -27,8 +30,10 @@ from app.schemas.project import (
     ProjectTechnologiesResponse,
     ProjectStatisticsResponse,
     ProjectScanResponse,
+    ProjectParseResponse,
 )
 from app.services.repository_scanner import repository_scanner
+
 
 
 
@@ -428,6 +433,197 @@ class ProjectService:
             infrastructure=project.infrastructure or [],
         )
 
+    async def parse_project_code(self, project_id: str, db: AsyncSession) -> ProjectParseResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if not base_path or not base_path.exists() or not base_path.is_dir():
+            raise ValidationException(
+                message="Project repository directory does not exist or has not been uploaded yet.",
+                details={"repository_path": project.repository_path if project else None},
+            )
+
+        project.status = "PARSING"
+        await db.commit()
+
+        try:
+            # 1. Clear any existing CodeEntity records for this project
+            await db.execute(delete(CodeEntity).where(CodeEntity.project_id == project_id))
+
+            # 2. Walk directory and parse all supported files (.py, .js, .jsx, .ts, .tsx, etc.)
+            parsed_files_count = 0
+            code_entities: List[CodeEntity] = []
+            breakdown: Dict[str, int] = {
+                "MODULE": 0,
+                "CLASS": 0,
+                "FUNCTION": 0,
+                "METHOD": 0,
+                "INTERFACE": 0,
+                "COMPONENT": 0,
+            }
+
+            for root, dirs, files in os.walk(base_path):
+                # Filter out ignored directories in-place
+                dirs[:] = [
+                    d for d in dirs
+                    if d not in settings.IGNORED_DIRECTORIES and not d.startswith(".")
+                ]
+
+                for file_name in sorted(files):
+                    file_path = Path(root) / file_name
+                    if not code_parsing_engine.is_supported_file(str(file_path)):
+                        continue
+
+                    # Skip ignored or oversized files
+                    try:
+                        max_file_size = getattr(settings, "MAX_FILE_SIZE_BYTES", 2 * 1024 * 1024)
+                        if file_path.stat().st_size > max_file_size:
+                            continue
+                    except OSError:
+                        continue
+
+
+                    rel_path = file_path.relative_to(base_path).as_posix()
+
+                    try:
+                        content = file_path.read_text(encoding="utf-8", errors="replace")
+                        extracted = code_parsing_engine.parse_file(rel_path, content)
+                        parsed_files_count += 1
+
+                        for item in extracted:
+                            entity_id = str(uuid.uuid4())
+                            entity = CodeEntity(
+                                id=entity_id,
+                                project_id=project_id,
+                                file_path=rel_path,
+                                name=item.name,
+                                entity_type=item.entity_type,
+                                start_line=item.start_line,
+                                end_line=item.end_line,
+                                signature=item.signature,
+                                parent_entity=item.parent_entity,
+                                metadata_json=item.metadata or {},
+                            )
+                            code_entities.append(entity)
+                            breakdown[item.entity_type] = breakdown.get(item.entity_type, 0) + 1
+                    except Exception as fe:
+                        logger.warning(f"Error parsing file {rel_path} in project {project_id}: {fe}")
+
+            if code_entities:
+                db.add_all(code_entities)
+
+            project.status = "PARSED"
+            project.error_message = None
+            await db.commit()
+            await db.refresh(project)
+
+            logger.info(
+                f"Parsed {parsed_files_count} files for project {project_id}, "
+                f"extracted {len(code_entities)} entities: {breakdown}"
+            )
+
+            return ProjectParseResponse(
+                project_id=project.id,
+                status=project.status,
+                total_files_parsed=parsed_files_count,
+                total_entities_extracted=len(code_entities),
+                entity_breakdown=breakdown,
+                parsed_at=utc_now(),
+            )
+        except Exception as e:
+            project.status = "FAILED"
+            project.error_message = f"Code parsing failed: {str(e)}"
+            await db.commit()
+            logger.exception(f"Code parsing failed for project {project_id}: {str(e)}")
+            raise StorageException(message=f"Failed to parse source code: {str(e)}")
+
+    async def get_project_entities(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        entity_type: Optional[str] = None,
+        file_path: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> List[CodeEntity]:
+        await self.get_project(project_id, db)
+        query = select(CodeEntity).where(CodeEntity.project_id == project_id)
+
+        if entity_type:
+            query = query.where(CodeEntity.entity_type == entity_type.upper())
+        if file_path:
+            norm_path = file_path.replace("\\", "/").strip("/")
+            query = query.where(
+                (CodeEntity.file_path == norm_path) |
+                (CodeEntity.file_path == file_path) |
+                CodeEntity.file_path.endswith("/" + norm_path)
+            )
+        if name:
+            query = query.where(CodeEntity.name.ilike(f"%{name}%"))
+
+        query = query.order_by(CodeEntity.file_path.asc(), CodeEntity.start_line.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_entity_by_id(
+        self,
+        project_id: str,
+        entity_id: str,
+        db: AsyncSession,
+    ) -> CodeEntity:
+        await self.get_project(project_id, db)
+        query = select(CodeEntity).where(
+            CodeEntity.project_id == project_id,
+            CodeEntity.id == entity_id,
+        )
+        result = await db.execute(query)
+        entity = result.scalar_one_or_none()
+        if not entity:
+            raise EntityNotFoundException("CodeEntity", entity_id)
+        return entity
+
+    async def get_file_entities(
+        self,
+        project_id: str,
+        file_id: str,
+        db: AsyncSession,
+    ) -> List[CodeEntity]:
+        await self.get_project(project_id, db)
+
+        # Decode file_id (supports raw path, URL-encoded path, or Base64-encoded path)
+        candidates = [file_id]
+        try:
+            unquoted = unquote(file_id)
+            if unquoted not in candidates:
+                candidates.append(unquoted)
+        except Exception:
+            pass
+
+        try:
+            padded = file_id + "=" * (-len(file_id) % 4)
+            decoded = base64.b64decode(padded).decode("utf-8")
+            if decoded and decoded not in candidates:
+                candidates.append(decoded)
+        except Exception:
+            pass
+
+        norm_candidates = set()
+        for c in candidates:
+            c_norm = c.replace("\\", "/").strip("/")
+            norm_candidates.add(c_norm)
+            norm_candidates.add(Path(c).name)
+
+        query = select(CodeEntity).where(CodeEntity.project_id == project_id)
+        result = await db.execute(query)
+        all_entities = list(result.scalars().all())
+
+        matched = [
+            e for e in all_entities
+            if e.file_path in norm_candidates
+            or any(e.file_path.endswith("/" + c) or e.file_path == c for c in norm_candidates)
+            or any(Path(e.file_path).name == c for c in norm_candidates)
+        ]
+        matched.sort(key=lambda e: (e.file_path, e.start_line))
+        return matched
 
 
 project_service = ProjectService()
+

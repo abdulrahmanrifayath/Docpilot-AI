@@ -75,6 +75,31 @@ export interface ProjectScanResponse {
   scanned_at: string;
 }
 
+export type CodeEntityType = 'MODULE' | 'CLASS' | 'FUNCTION' | 'METHOD' | 'INTERFACE' | 'COMPONENT';
+
+export interface CodeEntity {
+  id: string;
+  project_id: string;
+  file_path: string;
+  name: string;
+  entity_type: CodeEntityType;
+  start_line: number;
+  end_line: number;
+  signature?: string;
+  parent_entity?: string;
+  metadata: Record<string, any>;
+}
+
+export interface ProjectParseResponse {
+  project_id: string;
+  status: string;
+  total_files_parsed: number;
+  total_entities_extracted: number;
+  entity_breakdown: Record<string, number>;
+  parsed_at: string;
+}
+
+
 
 export interface ProjectCreatePayload {
   name: string;

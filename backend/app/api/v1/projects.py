@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
@@ -12,8 +12,11 @@ from app.schemas.project import (
     ProjectTechnologiesResponse,
     ProjectStatisticsResponse,
     ProjectScanResponse,
+    CodeEntityResponse,
+    ProjectParseResponse,
 )
 from app.services.project_service import project_service
+
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -138,4 +141,64 @@ async def get_project_statistics(
     """Retrieve project-level metrics including file counts, lines of code, and language distribution."""
     result = await project_service.get_project_statistics(project_id, db)
     return result
+
+
+@router.post("/{project_id}/parse", response_model=ProjectParseResponse)
+async def parse_project_code(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ProjectParseResponse:
+    """Trigger static code parsing engine (Python AST, JS/TS Tree-sitter) without AI."""
+    result = await project_service.parse_project_code(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/entities", response_model=List[CodeEntityResponse])
+async def list_project_entities(
+    project_id: str,
+    entity_type: Optional[str] = Query(None, description="Filter by entity type (MODULE, CLASS, FUNCTION, METHOD, INTERFACE, COMPONENT)"),
+    file_path: Optional[str] = Query(None, description="Filter by file path"),
+    name: Optional[str] = Query(None, description="Search by entity name"),
+    db: AsyncSession = Depends(get_db),
+) -> List[CodeEntityResponse]:
+    """Retrieve normalized code entities extracted across the project."""
+    entities = await project_service.get_project_entities(
+        project_id=project_id,
+        db=db,
+        entity_type=entity_type,
+        file_path=file_path,
+        name=name,
+    )
+    return entities
+
+
+@router.get("/{project_id}/entities/{entity_id}", response_model=CodeEntityResponse)
+async def get_project_entity(
+    project_id: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> CodeEntityResponse:
+    """Retrieve a single code entity by its unique ID."""
+    entity = await project_service.get_entity_by_id(
+        project_id=project_id,
+        entity_id=entity_id,
+        db=db,
+    )
+    return entity
+
+
+@router.get("/{project_id}/files/{file_id:path}/entities", response_model=List[CodeEntityResponse])
+async def list_file_entities(
+    project_id: str,
+    file_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> List[CodeEntityResponse]:
+    """Retrieve normalized code entities for a specific file path or file identifier."""
+    entities = await project_service.get_file_entities(
+        project_id=project_id,
+        file_id=file_id,
+        db=db,
+    )
+    return entities
+
 

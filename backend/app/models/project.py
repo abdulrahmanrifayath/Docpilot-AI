@@ -53,9 +53,30 @@ class Project(Base):
     documents = relationship("Document", back_populates="project", cascade="all, delete-orphan")
     diagrams = relationship("Diagram", back_populates="project", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
+    code_entities = relationship("CodeEntity", back_populates="project", cascade="all, delete-orphan")
+
+
+class CodeEntity(Base):
+    __tablename__ = "code_entities"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    file_path = Column(String(500), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False, index=True)  # MODULE, CLASS, FUNCTION, METHOD, INTERFACE, COMPONENT
+    start_line = Column(Integer, nullable=False, default=1)
+    end_line = Column(Integer, nullable=False, default=1)
+    signature = Column(Text, nullable=True)
+    parent_entity = Column(String(255), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="code_entities")
 
 
 class Document(Base):
+
     __tablename__ = "documents"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)

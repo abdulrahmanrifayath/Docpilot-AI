@@ -6,12 +6,15 @@ import {
   ProjectTechnologiesResponse,
   ProjectStatisticsResponse,
   ProjectScanResponse,
+  CodeEntity,
+  ProjectParseResponse,
   SystemStatus,
   DocumentItem,
   DiagramItem,
   ChatMessage,
   ProviderSettings,
 } from '../types';
+
 
 
 const API_V1 = '/api/v1';
@@ -119,6 +122,47 @@ export async function fetchProjectStatistics(id: string): Promise<ProjectStatist
   if (!res.ok) throw new Error('Failed to fetch project statistics');
   return res.json();
 }
+
+export async function parseProjectCode(id: string): Promise<ProjectParseResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/parse`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Code parsing failed' } }));
+    throw new Error(err.error?.message || 'Code parsing failed');
+  }
+  return res.json();
+}
+
+export async function fetchProjectEntities(
+  id: string,
+  options?: { entity_type?: string; file_path?: string; name?: string }
+): Promise<CodeEntity[]> {
+  const params = new URLSearchParams();
+  if (options?.entity_type) params.append('entity_type', options.entity_type);
+  if (options?.file_path) params.append('file_path', options.file_path);
+  if (options?.name) params.append('name', options.name);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/entities${query}`);
+  if (!res.ok) throw new Error('Failed to fetch project entities');
+  return res.json();
+}
+
+export async function fetchProjectEntity(id: string, entityId: string): Promise<CodeEntity> {
+  const res = await fetch(`${API_V1}/projects/${id}/entities/${entityId}`);
+  if (!res.ok) throw new Error('Failed to fetch entity details');
+  return res.json();
+}
+
+export async function fetchFileEntities(id: string, filePathOrId: string): Promise<CodeEntity[]> {
+  // Support slashes by URL encoding or raw path
+  const encoded = encodeURIComponent(filePathOrId);
+  const res = await fetch(`${API_V1}/projects/${id}/files/${encoded}/entities`);
+  if (!res.ok) throw new Error('Failed to fetch file entities');
+  return res.json();
+}
+
 
 
 export async function fetchDocuments(projectId: string): Promise<DocumentItem[]> {

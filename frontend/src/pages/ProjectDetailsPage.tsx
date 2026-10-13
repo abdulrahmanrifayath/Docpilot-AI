@@ -31,6 +31,10 @@ import {
   Scan,
   Check,
   Search,
+  Boxes,
+  Braces,
+  Hash,
+  Sparkles,
 } from 'lucide-react';
 import {
   Project,
@@ -38,6 +42,9 @@ import {
   ProjectStructureResponse,
   ProjectTechnologiesResponse,
   ProjectStatisticsResponse,
+  CodeEntity,
+  CodeEntityType,
+  ProjectParseResponse,
 } from '../types';
 import {
   fetchProject,
@@ -45,11 +52,15 @@ import {
   fetchProjectTechnologies,
   fetchProjectStatistics,
   scanProject,
+  parseProjectCode,
+  fetchFileEntities,
+  fetchProjectEntities,
   uploadProjectZip,
   cloneProjectGit,
   deleteProject,
 } from '../api/client';
 import { useProjects } from '../context/ProjectContext';
+
 
 // Recursive File Tree Node component
 interface FileTreeNodeProps {
@@ -221,6 +232,13 @@ export const ProjectDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [scanning, setScanning] = useState<boolean>(false);
   const [scanSuccess, setScanSuccess] = useState<boolean>(false);
+  const [parsing, setParsing] = useState<boolean>(false);
+  const [parseSuccess, setParseSuccess] = useState<boolean>(false);
+  const [parseSummary, setParseSummary] = useState<ProjectParseResponse | null>(null);
+  const [fileEntities, setFileEntities] = useState<CodeEntity[]>([]);
+  const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
+  const [entityFilter, setEntityFilter] = useState<string>('ALL');
+  const [totalEntitiesCount, setTotalEntitiesCount] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState<string>('');
 
@@ -237,11 +255,12 @@ export const ProjectDetailsPage: React.FC = () => {
   const loadAllData = async (projId: string) => {
     try {
       setLoading(true);
-      const [proj, struct, tech, stats] = await Promise.all([
+      const [proj, struct, tech, stats, allEntities] = await Promise.all([
         fetchProject(projId),
         fetchProjectStructure(projId).catch(() => null),
         fetchProjectTechnologies(projId).catch(() => null),
         fetchProjectStatistics(projId).catch(() => null),
+        fetchProjectEntities(projId).catch(() => []),
       ]);
 
       setProject(proj);
@@ -249,10 +268,29 @@ export const ProjectDetailsPage: React.FC = () => {
       setStructureData(struct);
       setTechData(tech);
       setStatsData(stats);
+      setTotalEntitiesCount(allEntities.length);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load project details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectNode = async (node: ProjectStructureNode) => {
+    setSelectedFileNode(node);
+    if (node.type === 'file' && project) {
+      setLoadingEntities(true);
+      try {
+        const ents = await fetchFileEntities(project.id, node.path);
+        setFileEntities(ents);
+      } catch (err) {
+        console.warn('Failed to load file entities:', err);
+        setFileEntities([]);
+      } finally {
+        setLoadingEntities(false);
+      }
+    } else {
+      setFileEntities([]);
     }
   };
 
@@ -273,7 +311,32 @@ export const ProjectDetailsPage: React.FC = () => {
     }
   };
 
+  const handleParseCode = async () => {
+    if (!project) return;
+    setParsing(true);
+    setParseSuccess(false);
+    try {
+      const res = await parseProjectCode(project.id);
+      setParseSummary(res);
+      setParseSuccess(true);
+      setTotalEntitiesCount(res.total_entities_extracted);
+      await loadAllData(project.id);
+      await refreshProjects();
+      if (selectedFileNode && selectedFileNode.type === 'file') {
+        const ents = await fetchFileEntities(project.id, selectedFileNode.path);
+        setFileEntities(ents);
+      }
+      setTimeout(() => setParseSuccess(false), 4000);
+    } catch (err: any) {
+      alert(`Code parsing failed: ${err.message || err}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const handleDelete = async () => {
+
+
     if (!project) return;
     if (!window.confirm(`Delete project "${project.name}" and remove all isolated files?`)) return;
     try {
@@ -411,6 +474,27 @@ export const ProjectDetailsPage: React.FC = () => {
             <span>{scanning ? 'Scanning...' : scanSuccess ? 'Scan Complete' : 'Scan Repository'}</span>
           </button>
 
+          {/* Parse Code Button */}
+          <button
+            onClick={handleParseCode}
+            disabled={parsing || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              parseSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25'
+            } disabled:opacity-50`}
+            title="Parse Python AST and JS/TS Tree-sitter entities without AI"
+          >
+            {parsing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : parseSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Code2 className="w-3.5 h-3.5" />
+            )}
+            <span>{parsing ? 'Parsing AST...' : parseSuccess ? 'Code Parsed' : 'Parse Code'}</span>
+          </button>
+
           <button
             onClick={() => id && loadAllData(id)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
@@ -429,6 +513,26 @@ export const ProjectDetailsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Parse Summary Banner if freshly parsed */}
+      {parseSummary && (
+        <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div>
+              <span className="font-bold text-white">Static Code Parsing Engine Complete:</span>{' '}
+              Parsed {parseSummary.total_files_parsed} files, extracted {parseSummary.total_entities_extracted} entities.
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {Object.entries(parseSummary.entity_breakdown).map(([type, count]) => (
+              <span key={type} className="px-2 py-0.5 rounded-lg bg-indigo-950/80 border border-indigo-500/30 text-[11px] font-mono text-indigo-300">
+                {type}: <strong className="text-white">{count}</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Error Alert if Failed */}
       {isFailed && project.error_message && (
         <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-3">
@@ -446,7 +550,7 @@ export const ProjectDetailsPage: React.FC = () => {
           <Activity className="w-3.5 h-3.5 text-brand-400" />
           <span>Project Overview & Discovery Metrics</span>
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Files</span>
             <p className="text-2xl font-extrabold text-white mt-1">{totalFiles.toLocaleString()}</p>
@@ -468,6 +572,14 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">
+              Parsed Code Entities
+            </span>
+            <p className="text-2xl font-extrabold text-indigo-300 mt-1">{totalEntitiesCount.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">AST classes, methods, functions</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Last Analysis</span>
             <p className="text-xs font-semibold text-white mt-2 truncate">
               {project.last_analyzed_at
@@ -478,6 +590,7 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
 
       {/* SECTION 2: TECHNOLOGY INTELLIGENCE (Languages, Frameworks, Infrastructure) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -666,9 +779,9 @@ export const ProjectDetailsPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Tree Navigation Column */}
-            <div className="lg:col-span-2 max-h-[520px] overflow-y-auto pr-2 border-r border-slate-800/80">
+            <div className="lg:col-span-5 max-h-[640px] overflow-y-auto pr-2 border-r border-slate-800/80">
               <div className="space-y-0.5">
                 {structureData.tree.children &&
                   structureData.tree.children.map((child) => (
@@ -677,89 +790,250 @@ export const ProjectDetailsPage: React.FC = () => {
                       node={child}
                       level={0}
                       selectedPath={selectedFileNode?.path || null}
-                      onSelect={(n) => setSelectedFileNode(n)}
+                      onSelect={(n) => handleSelectNode(n)}
                       searchFilter={searchFilter}
                     />
                   ))}
               </div>
             </div>
 
-            {/* Selected Node Details Column */}
-            <div className="lg:col-span-1">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                File & Component Inspector
-              </h3>
+            {/* Selected Node Details & Code Entity Inspector Column */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <Code2 className="w-4 h-4 text-brand-400" />
+                  <span>File & AST Code Inspector</span>
+                </h3>
+                {selectedFileNode && (
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {fileEntities.length} entities detected
+                  </span>
+                )}
+              </div>
+
               {selectedFileNode ? (
-                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3.5">
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                      Name
-                    </span>
-                    <p className="text-xs font-bold text-white break-all mt-0.5">
-                      {selectedFileNode.name}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                      Relative Path
-                    </span>
-                    <p className="text-xs font-mono text-slate-300 break-all mt-0.5 bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                      {selectedFileNode.path}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
-                        Category
-                      </span>
-                      <span className="font-semibold text-white capitalize mt-0.5 inline-block">
-                        {selectedFileNode.file_category || selectedFileNode.type}
-                      </span>
+                <div className="space-y-4">
+                  {/* File Metadata Overview */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                          Selected File
+                        </span>
+                        <p className="text-xs font-bold text-white break-all mt-0.5">
+                          {selectedFileNode.name}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {selectedFileNode.language && (
+                          <span className="px-2 py-0.5 rounded-lg bg-brand-500/10 border border-brand-500/30 text-brand-300 text-[10px] font-semibold">
+                            {selectedFileNode.language}
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-semibold capitalize">
+                          {selectedFileNode.file_category || selectedFileNode.type}
+                        </span>
+                        {selectedFileNode.estimated_line_count !== undefined && (
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-mono">
+                            {selectedFileNode.estimated_line_count.toLocaleString()} lines
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
-                        Language
-                      </span>
-                      <span className="font-semibold text-brand-300 mt-0.5 inline-block">
-                        {selectedFileNode.language || 'Plain Text / Other'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedFileNode.estimated_line_count !== undefined && (
-                    <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                        Lines of Code
-                      </span>
-                      <p className="text-xs font-mono font-semibold text-white mt-0.5">
-                        {selectedFileNode.estimated_line_count.toLocaleString()} lines
+                      <p className="text-[11px] font-mono text-slate-400 break-all bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+                        {selectedFileNode.path}
                       </p>
                     </div>
-                  )}
+                  </div>
 
-                  {selectedFileNode.file_size !== undefined && (
-                    <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                        File Size
-                      </span>
-                      <p className="text-xs font-semibold text-white mt-0.5">
-                        {selectedFileNode.file_size.toLocaleString()} bytes
-                      </p>
+                  {/* STATIC CODE ENTITIES SECTION */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Boxes className="w-4 h-4 text-indigo-400" />
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                          Extracted Static Code Entities
+                        </h4>
+                      </div>
+
+                      {/* Filter Pills */}
+                      {fileEntities.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {[
+                            { key: 'ALL', label: `All (${fileEntities.length})` },
+                            { key: 'CLASS', label: `Classes (${fileEntities.filter((e) => e.entity_type === 'CLASS').length})` },
+                            { key: 'FUNCTION', label: `Functions (${fileEntities.filter((e) => e.entity_type === 'FUNCTION').length})` },
+                            { key: 'METHOD', label: `Methods (${fileEntities.filter((e) => e.entity_type === 'METHOD').length})` },
+                            { key: 'COMPONENT', label: `Components (${fileEntities.filter((e) => e.entity_type === 'COMPONENT').length})` },
+                            { key: 'INTERFACE', label: `Interfaces (${fileEntities.filter((e) => e.entity_type === 'INTERFACE').length})` },
+                          ]
+                            .filter((f) => f.key === 'ALL' || !f.label.includes('(0)'))
+                            .map((f) => (
+                              <button
+                                key={f.key}
+                                onClick={() => setEntityFilter(f.key)}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-colors ${
+                                  entityFilter === f.key
+                                    ? 'bg-brand-600 text-white shadow-sm'
+                                    : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800'
+                                }`}
+                              >
+                                {f.label}
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                    <p>
-                      Files are parsed statically. Phase 4 will generate interactive Mermaid architecture diagrams and dependency graphs.
-                    </p>
+                    {/* Entities Content */}
+                    {loadingEntities ? (
+                      <div className="py-8 text-center text-slate-400 flex flex-col items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-brand-400 mb-2" />
+                        <span className="text-xs">Extracting AST entities for this file...</span>
+                      </div>
+                    ) : fileEntities.length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 space-y-2">
+                        <Braces className="w-7 h-7 text-slate-600 mx-auto" />
+                        <p className="text-xs font-semibold text-slate-400">
+                          No code entities detected for this file
+                        </p>
+                        <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                          Python AST and Tree-sitter extract modules, classes, methods, functions, interfaces, and components.
+                        </p>
+                        <button
+                          onClick={handleParseCode}
+                          disabled={parsing}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition-all"
+                        >
+                          {parsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Code2 className="w-3.5 h-3.5" />}
+                          <span>{parsing ? 'Parsing...' : 'Parse Repository Code'}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="max-h-[460px] overflow-y-auto space-y-3 pr-1">
+                        {fileEntities
+                          .filter((e) => entityFilter === 'ALL' || e.entity_type === entityFilter)
+                          .map((entity) => {
+                            const badgeColor =
+                              entity.entity_type === 'CLASS'
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : entity.entity_type === 'FUNCTION'
+                                ? 'bg-sky-500/15 text-sky-400 border-sky-500/30'
+                                : entity.entity_type === 'METHOD'
+                                ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                                : entity.entity_type === 'COMPONENT'
+                                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                : entity.entity_type === 'INTERFACE'
+                                ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
+                                : 'bg-slate-700/50 text-slate-300 border-slate-600';
+
+                            const bases = entity.metadata?.bases || entity.metadata?.inheritance || [];
+                            const decorators = entity.metadata?.decorators || [];
+                            const docstring = entity.metadata?.docstring;
+                            const isAsync = entity.metadata?.is_async;
+                            const returnType = entity.metadata?.return_annotation || entity.metadata?.return_type;
+
+                            return (
+                              <div
+                                key={entity.id}
+                                className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all space-y-2.5"
+                              >
+                                {/* Entity Top Header */}
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider border uppercase ${badgeColor}`}
+                                    >
+                                      {entity.entity_type}
+                                    </span>
+                                    <span className="text-xs font-bold text-white font-mono">
+                                      {entity.name}
+                                    </span>
+                                    {isAsync && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                        async
+                                      </span>
+                                    )}
+                                    {entity.parent_entity && (
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        in <strong className="text-slate-300">{entity.parent_entity}</strong>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Line Range */}
+                                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                                    <Hash className="w-3 h-3 text-slate-500" />
+                                    <span>
+                                      L{entity.start_line}
+                                      {entity.end_line && entity.end_line !== entity.start_line
+                                        ? ` - L${entity.end_line}`
+                                        : ''}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Code Signature */}
+                                {entity.signature && (
+                                  <div className="bg-slate-900 p-2 rounded-lg border border-slate-800/90 font-mono text-[11px] text-brand-300 overflow-x-auto whitespace-pre">
+                                    <code>{entity.signature}</code>
+                                  </div>
+                                )}
+
+                                {/* Metadata Details: Bases, Decorators, Return Type, Docstring */}
+                                <div className="space-y-1.5 text-[11px]">
+                                  {bases.length > 0 && (
+                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                      <span className="font-semibold text-slate-300">Inheritance:</span>
+                                      <span className="text-emerald-300 font-mono">
+                                        {bases.join(', ')}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {decorators.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-semibold text-slate-400">Decorators:</span>
+                                      {decorators.map((dec: string, idx: number) => (
+                                        <span
+                                          key={idx}
+                                          className="px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-300 font-mono text-[10px]"
+                                        >
+                                          @{dec}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {returnType && (
+                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                      <span className="font-semibold text-slate-300">Return:</span>
+                                      <span className="text-cyan-300 font-mono">{returnType}</span>
+                                    </div>
+                                  )}
+
+                                  {docstring && (
+                                    <div className="p-2 rounded bg-slate-900/60 border border-slate-800/60 text-slate-400 italic text-[11px] leading-relaxed">
+                                      &ldquo;{docstring}&rdquo;
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center text-slate-500">
-                  <p className="text-xs">Select any file in the tree to inspect its path, language, category, and lines of code.</p>
+                <div className="p-8 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center text-slate-500">
+                  <FileCode className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-400">No File Selected</p>
+                  <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
+                    Select any file in the tree to inspect its detected classes, functions, methods, components, signatures, and line ranges.
+                  </p>
                 </div>
               )}
             </div>
@@ -769,3 +1043,4 @@ export const ProjectDetailsPage: React.FC = () => {
     </div>
   );
 };
+

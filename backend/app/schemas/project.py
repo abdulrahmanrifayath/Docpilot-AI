@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices
 
 
 class ProjectCreate(BaseModel):
@@ -113,4 +113,32 @@ class ProjectScanResponse(BaseModel):
     frameworks: List[str] = Field(default_factory=list)
     infrastructure: List[str] = Field(default_factory=list)
     scanned_at: datetime
+
+
+
+
+class CodeEntityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    project_id: str
+    file_path: str
+    name: str
+    entity_type: str  # MODULE, CLASS, FUNCTION, METHOD, INTERFACE, COMPONENT
+    start_line: int
+    end_line: int
+    signature: Optional[str] = None
+    parent_entity: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+
+
+class ProjectParseResponse(BaseModel):
+    project_id: str
+    status: str
+    total_files_parsed: int
+    total_entities_extracted: int
+    entity_breakdown: Dict[str, int] = Field(default_factory=dict)
+    parsed_at: datetime
+
 

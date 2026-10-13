@@ -4,6 +4,8 @@ from app.models.project import (
     Diagram,
     ChatMessage,
     Repository,
+    CodeEntity,
 )
 
-__all__ = ["Project", "Document", "Diagram", "ChatMessage", "Repository"]
+__all__ = ["Project", "Document", "Diagram", "ChatMessage", "Repository", "CodeEntity"]
+
