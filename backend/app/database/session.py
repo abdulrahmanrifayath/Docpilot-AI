@@ -63,6 +63,18 @@ async def init_db() -> None:
                     await conn.execute(text("ALTER TABLE documents ADD COLUMN version INTEGER DEFAULT 1"))
                 if "generated_at" not in d_cols and "id" in d_cols:
                     await conn.execute(text("ALTER TABLE documents ADD COLUMN generated_at TIMESTAMP"))
+
+                # Diagrams table Phase 10 columns migration
+                diag_res = await conn.execute(text("PRAGMA table_info(diagrams)"))
+                diag_cols = {row[1] for row in diag_res.fetchall()}
+                if "description" not in diag_cols and "id" in diag_cols:
+                    await conn.execute(text("ALTER TABLE diagrams ADD COLUMN description VARCHAR(500)"))
+                if "source_entities" not in diag_cols and "id" in diag_cols:
+                    await conn.execute(text("ALTER TABLE diagrams ADD COLUMN source_entities JSON DEFAULT '[]'"))
+                if "version" not in diag_cols and "id" in diag_cols:
+                    await conn.execute(text("ALTER TABLE diagrams ADD COLUMN version INTEGER DEFAULT 1"))
+                if "metadata" not in diag_cols and "id" in diag_cols:
+                    await conn.execute(text("ALTER TABLE diagrams ADD COLUMN metadata JSON DEFAULT '{}'"))
             except Exception:
                 pass
 

@@ -64,8 +64,11 @@ from app.schemas.project import (
     KnowledgeEntityDetailResponse,
     DocumentResponse,
     DocumentGenerateResponse,
+    DiagramResponse,
+    DiagramGenerateResponse,
 )
 from app.services.documentation_service import documentation_service
+from app.services.diagram_service import diagram_service
 from app.services.repository_scanner import repository_scanner
 
 
@@ -1407,6 +1410,63 @@ class ProjectService:
         return await documentation_service.regenerate_document(
             project_id=project_id,
             document_id=document_id,
+            db=db,
+        )
+
+    # -------------------------------------------------------------------------
+    # Phase 10: Automatic Architecture Diagram Generation
+    # -------------------------------------------------------------------------
+    async def generate_diagrams(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        diagram_types: Optional[List[str]] = None,
+        include_flow_data: bool = True,
+        use_llm_enhancement: bool = False,
+        force_regenerate: bool = False,
+    ) -> DiagramGenerateResponse:
+        return await diagram_service.generate_all_diagrams(
+            project_id=project_id,
+            diagram_types=diagram_types,
+            db=db,
+            include_flow_data=include_flow_data,
+            use_llm_enhancement=use_llm_enhancement,
+            force_regenerate=force_regenerate,
+        )
+
+    async def list_diagrams(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        diagram_type: Optional[str] = None,
+    ) -> List[DiagramResponse]:
+        return await diagram_service.list_diagrams(
+            project_id=project_id,
+            db=db,
+            diagram_type=diagram_type,
+        )
+
+    async def get_diagram_by_id(
+        self,
+        project_id: str,
+        diagram_id: str,
+        db: AsyncSession,
+    ) -> DiagramResponse:
+        return await diagram_service.get_diagram_by_id(
+            project_id=project_id,
+            diagram_id=diagram_id,
+            db=db,
+        )
+
+    async def regenerate_diagram(
+        self,
+        project_id: str,
+        diagram_id: str,
+        db: AsyncSession,
+    ) -> DiagramResponse:
+        return await diagram_service.regenerate_diagram(
+            project_id=project_id,
+            diagram_id=diagram_id,
             db=db,
         )
 

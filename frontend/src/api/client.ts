@@ -30,6 +30,8 @@ import {
   DocumentGeneratePayload,
   DocumentGenerateResponse,
   DiagramItem,
+  DiagramGeneratePayload,
+  DiagramGenerateResponse,
   ChatMessage,
   ProviderSettings,
 } from '../types';
@@ -463,11 +465,58 @@ export async function fetchDocuments(projectId: string): Promise<DocumentItem[]>
   return legacyRes.json();
 }
 
-export async function fetchDiagrams(projectId: string): Promise<DiagramItem[]> {
-  const res = await fetch(`${API_V1}/repositories/${projectId}/diagrams`);
-  if (!res.ok) return [];
+export async function generateDiagrams(
+  projectId: string,
+  payload?: DiagramGeneratePayload
+): Promise<DiagramGenerateResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/diagrams/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || 'Failed to generate architecture diagrams');
+  }
   return res.json();
 }
+
+export async function fetchProjectDiagrams(
+  projectId: string,
+  diagramType?: string
+): Promise<DiagramItem[]> {
+  const query = diagramType ? `?diagram_type=${encodeURIComponent(diagramType)}` : '';
+  const res = await fetch(`${API_V1}/projects/${projectId}/diagrams${query}`);
+  if (res.ok) return res.json();
+  const legacyRes = await fetch(`${API_V1}/repositories/${projectId}/diagrams`);
+  if (legacyRes.ok) return legacyRes.json();
+  return [];
+}
+
+export async function fetchProjectDiagram(
+  projectId: string,
+  diagramId: string
+): Promise<DiagramItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/diagrams/${diagramId}`);
+  if (!res.ok) throw new Error('Failed to fetch diagram detail');
+  return res.json();
+}
+
+export async function regenerateProjectDiagram(
+  projectId: string,
+  diagramId: string
+): Promise<DiagramItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/diagrams/${diagramId}/regenerate`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || 'Failed to regenerate diagram');
+  }
+  return res.json();
+}
+
+export const fetchDiagrams = fetchProjectDiagrams;
 
 export async function fetchChatHistory(projectId: string): Promise<ChatMessage[]> {
   const res = await fetch(`${API_V1}/repositories/${projectId}/chat`);

@@ -5,6 +5,7 @@ from app.ai.llm_client import (
     MockLLMClient,
     LLMNotConfiguredError,
     create_llm_client,
+    get_llm_client,
     default_llm_client,
 )
 from app.ai.embeddings import embedding_service, EmbeddingService
@@ -19,6 +20,7 @@ __all__ = [
     "MockLLMClient",
     "LLMNotConfiguredError",
     "create_llm_client",
+    "get_llm_client",
     "default_llm_client",
     "embedding_service",
     "EmbeddingService",

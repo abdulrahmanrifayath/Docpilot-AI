@@ -421,6 +421,45 @@ class DocumentGenerateResponse(BaseModel):
     message: Optional[str] = None
 
 
+# =============================================================================
+# PHASE 10: AUTOMATIC ARCHITECTURE DIAGRAM GENERATION SCHEMAS
+# =============================================================================
+
+class DiagramGenerateRequest(BaseModel):
+    diagram_types: Optional[List[str]] = Field(
+        None,
+        description="List of diagram types to generate: SYSTEM_ARCHITECTURE, MODULE_ARCHITECTURE, DEPENDENCY_DIAGRAM, API_SERVICE_RELATIONSHIP, DATABASE_ER",
+    )
+    include_flow_data: bool = Field(True, description="Whether to compute React Flow node/edge graph data")
+    use_llm_enhancement: bool = Field(False, description="Whether to optionally enhance diagram titles and descriptions via LLM")
+    force_regenerate: bool = Field(False, description="Whether to regenerate existing diagrams and bump version")
+
+
+class DiagramResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str = Field(validation_alias=AliasChoices("project_id", "repository_id"))
+    diagram_type: str
+    title: str
+    description: Optional[str] = None
+    mermaid_code: str
+    flow_data: Optional[Dict[str, Any]] = None
+    source_entities: List[str] = Field(default_factory=list)
+    version: int = 1
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class DiagramGenerateResponse(BaseModel):
+    status: str
+    project_id: str
+    total_generated: int
+    diagrams: List[DiagramResponse] = Field(default_factory=list)
+    message: Optional[str] = None
+
+
 
 
 

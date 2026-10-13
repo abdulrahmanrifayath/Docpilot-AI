@@ -244,3 +244,4 @@ def create_llm_client(
 
 # Default client instance
 default_llm_client = create_llm_client()
+get_llm_client = create_llm_client

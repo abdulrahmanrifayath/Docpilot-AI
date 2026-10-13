@@ -32,6 +32,9 @@ from app.schemas.project import (
     DocumentGenerateRequest,
     DocumentResponse,
     DocumentGenerateResponse,
+    DiagramGenerateRequest,
+    DiagramResponse,
+    DiagramGenerateResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -529,6 +532,84 @@ async def regenerate_project_document(
                 "provider": ex.provider,
                 "is_configured": False,
             },
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+# =============================================================================
+# PHASE 10: AUTOMATIC ARCHITECTURE DIAGRAM GENERATION ENDPOINTS
+# =============================================================================
+
+@router.post(
+    "/{project_id}/diagrams/generate",
+    response_model=DiagramGenerateResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_project_diagrams(
+    project_id: str,
+    payload: Optional[DiagramGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> DiagramGenerateResponse:
+    """Generate architecture diagrams automatically from repository analysis."""
+    req = payload or DiagramGenerateRequest()
+    try:
+        return await project_service.generate_diagrams(
+            project_id=project_id,
+            db=db,
+            diagram_types=req.diagram_types,
+            include_flow_data=req.include_flow_data,
+            use_llm_enhancement=req.use_llm_enhancement,
+            force_regenerate=req.force_regenerate,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.get("/{project_id}/diagrams", response_model=List[DiagramResponse])
+async def list_project_diagrams(
+    project_id: str,
+    diagram_type: Optional[str] = Query(None, description="Filter by diagram type (e.g. SYSTEM_ARCHITECTURE, MODULE_ARCHITECTURE, DEPENDENCY_DIAGRAM, API_SERVICE_RELATIONSHIP, DATABASE_ER)"),
+    db: AsyncSession = Depends(get_db),
+) -> List[DiagramResponse]:
+    """List all generated architecture diagrams for a project."""
+    await project_service.get_project(project_id, db)
+    return await project_service.list_diagrams(
+        project_id=project_id,
+        db=db,
+        diagram_type=diagram_type,
+    )
+
+
+@router.get("/{project_id}/diagrams/{diagram_id}", response_model=DiagramResponse)
+async def get_project_diagram(
+    project_id: str,
+    diagram_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DiagramResponse:
+    """Retrieve details and Mermaid code of a specific generated diagram."""
+    try:
+        return await project_service.get_diagram_by_id(
+            project_id=project_id,
+            diagram_id=diagram_id,
+            db=db,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.post("/{project_id}/diagrams/{diagram_id}/regenerate", response_model=DiagramResponse)
+async def regenerate_project_diagram(
+    project_id: str,
+    diagram_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DiagramResponse:
+    """Regenerate a specific diagram, refreshing analysis context and incrementing version."""
+    try:
+        return await project_service.regenerate_diagram(
+            project_id=project_id,
+            diagram_id=diagram_id,
+            db=db,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))

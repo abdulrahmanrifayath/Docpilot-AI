@@ -394,18 +394,52 @@ export interface DocumentItem {
   updated_at?: string;
 }
 
+export type ArchitectureDiagramType =
+  | 'SYSTEM_ARCHITECTURE'
+  | 'MODULE_ARCHITECTURE'
+  | 'DEPENDENCY_DIAGRAM'
+  | 'API_SERVICE_RELATIONSHIP'
+  | 'DATABASE_ER'
+  | 'architecture'
+  | 'sequence'
+  | 'er'
+  | 'dependency'
+  | 'react_flow'
+  | string;
+
 export interface DiagramItem {
   id: string;
-  repository_id: string;
-  project_id?: string;
-  diagram_type: 'architecture' | 'sequence' | 'er' | 'dependency' | 'react_flow';
+  project_id: string;
+  repository_id?: string;
+  diagram_type: ArchitectureDiagramType;
   title: string;
-  mermaid_code?: string;
+  description?: string;
+  mermaid_code: string;
   flow_data?: {
     nodes: any[];
     edges: any[];
-  };
-  created_at: string;
+  } | null;
+  source_entities?: string[];
+  version: number;
+  metadata?: Record<string, any>;
+  metadata_json?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DiagramGeneratePayload {
+  diagram_types?: string[];
+  include_flow_data?: boolean;
+  use_llm_enhancement?: boolean;
+  force_regenerate?: boolean;
+}
+
+export interface DiagramGenerateResponse {
+  status: string;
+  project_id: string;
+  total_generated: number;
+  diagrams: DiagramItem[];
+  message?: string;
 }
 
 export interface Citation {

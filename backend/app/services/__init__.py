@@ -1,6 +1,7 @@
 from app.services.pipeline_service import pipeline_service, PipelineService
 from app.services.sync_service import sync_service, SyncService
 from app.services.documentation_service import documentation_service, DocumentationService
+from app.services.diagram_service import diagram_service, DiagramService, validate_mermaid_syntax
 
 __all__ = [
     "pipeline_service",
@@ -9,5 +10,8 @@ __all__ = [
     "SyncService",
     "documentation_service",
     "DocumentationService",
+    "diagram_service",
+    "DiagramService",
+    "validate_mermaid_syntax",
 ]
 

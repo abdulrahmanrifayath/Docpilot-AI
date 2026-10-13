@@ -62,6 +62,10 @@ class Project(Base):
     knowledge_nodes = relationship("KnowledgeNode", back_populates="project", cascade="all, delete-orphan")
     knowledge_edges = relationship("KnowledgeEdge", back_populates="project", cascade="all, delete-orphan")
 
+    # Convenient synonyms
+    entities = synonym("code_entities")
+    dependencies = synonym("dependency_relationships")
+
 
 class CodeEntity(Base):
     __tablename__ = "code_entities"
@@ -114,6 +118,9 @@ class DependencyRelationship(Base):
     metadata_json = Column("metadata", JSON, default=dict)
 
     created_at = Column(DateTime, default=utc_now)
+
+    source_name = synonym("source")
+    target_name = synonym("target")
 
     project = relationship("Project", back_populates="dependency_relationships")
 
@@ -262,12 +269,16 @@ class Diagram(Base):
     __tablename__ = "diagrams"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     repository_id = synonym("project_id")
-    diagram_type = Column(String(50), nullable=False)  # architecture, sequence, er, dependency, react_flow
+    diagram_type = Column(String(50), nullable=False, index=True)  # SYSTEM_ARCHITECTURE, MODULE_ARCHITECTURE, DEPENDENCY_DIAGRAM, API_SERVICE_RELATIONSHIP, DATABASE_ER
     title = Column(String(255), nullable=False)
+    description = Column(String(500), nullable=True)
     mermaid_code = Column(Text, nullable=True)
     flow_data = Column(JSON, nullable=True)  # React Flow nodes & edges
+    source_entities = Column(JSON, default=list)
+    version = Column(Integer, nullable=False, default=1)
+    metadata_json = Column("metadata", JSON, default=dict)
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
