@@ -99,6 +99,82 @@ export interface ProjectParseResponse {
   parsed_at: string;
 }
 
+export type DependencyRelationshipType =
+  | 'IMPORTS'
+  | 'CALLS'
+  | 'EXTENDS'
+  | 'IMPLEMENTS'
+  | 'DEPENDS_ON'
+  | 'USES';
+
+export type DependencyNodeType =
+  | 'file'
+  | 'module'
+  | 'class'
+  | 'function'
+  | 'service'
+  | 'component'
+  | 'interface'
+  | 'external';
+
+export interface DependencyNode {
+  id: string;
+  project_id: string;
+  name: string;
+  node_type: DependencyNodeType;
+  file_path?: string;
+  entity_id?: string;
+  is_external: boolean;
+  metadata: Record<string, any>;
+}
+
+export interface DependencyRelationship {
+  id: string;
+  project_id: string;
+  source: string;
+  target: string;
+  source_type: string;
+  target_type: string;
+  relationship_type: DependencyRelationshipType;
+  confidence: number;
+  is_external: boolean;
+  metadata: Record<string, any>;
+}
+
+export interface DependencyGraphResponse {
+  project_id: string;
+  nodes: DependencyNode[];
+  edges: DependencyRelationship[];
+  stats: {
+    total_nodes: number;
+    total_edges: number;
+    node_types: Record<string, number>;
+    relationship_types: Record<string, number>;
+  };
+}
+
+export interface DependencyAnalysisResponse {
+  project_id: string;
+  status: string;
+  total_nodes: number;
+  total_edges: number;
+  internal_dependencies: number;
+  external_dependencies: number;
+  breakdown: Record<string, number>;
+  analyzed_at: string;
+}
+
+export interface EntityDependenciesResponse {
+  project_id: string;
+  entity_id: string;
+  entity_name: string;
+  node?: DependencyNode;
+  incoming: DependencyRelationship[];
+  outgoing: DependencyRelationship[];
+  neighbors: DependencyNode[];
+}
+
+
 
 
 export interface ProjectCreatePayload {

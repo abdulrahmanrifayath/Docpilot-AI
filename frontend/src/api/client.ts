@@ -8,12 +8,18 @@ import {
   ProjectScanResponse,
   CodeEntity,
   ProjectParseResponse,
+  DependencyNode,
+  DependencyRelationship,
+  DependencyGraphResponse,
+  DependencyAnalysisResponse,
+  EntityDependenciesResponse,
   SystemStatus,
   DocumentItem,
   DiagramItem,
   ChatMessage,
   ProviderSettings,
 } from '../types';
+
 
 
 
@@ -162,6 +168,57 @@ export async function fetchFileEntities(id: string, filePathOrId: string): Promi
   if (!res.ok) throw new Error('Failed to fetch file entities');
   return res.json();
 }
+
+export async function analyzeDependencies(id: string): Promise<DependencyAnalysisResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/dependencies/analyze`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Dependency analysis failed' } }));
+    throw new Error(err.error?.message || 'Dependency analysis failed');
+  }
+  return res.json();
+}
+
+export async function fetchDependencies(
+  id: string,
+  options?: {
+    relationship_type?: string;
+    source?: string;
+    target?: string;
+    is_external?: boolean;
+    min_confidence?: number;
+  }
+): Promise<DependencyRelationship[]> {
+  const params = new URLSearchParams();
+  if (options?.relationship_type) params.append('relationship_type', options.relationship_type);
+  if (options?.source) params.append('source', options.source);
+  if (options?.target) params.append('target', options.target);
+  if (options?.is_external !== undefined) params.append('is_external', String(options.is_external));
+  if (options?.min_confidence !== undefined) params.append('min_confidence', String(options.min_confidence));
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/dependencies${query}`);
+  if (!res.ok) throw new Error('Failed to fetch dependencies');
+  return res.json();
+}
+
+export async function fetchDependencyGraph(id: string): Promise<DependencyGraphResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/dependencies/graph`);
+  if (!res.ok) throw new Error('Failed to fetch dependency graph');
+  return res.json();
+}
+
+export async function fetchEntityDependencies(
+  id: string,
+  entityId: string
+): Promise<EntityDependenciesResponse> {
+  const encoded = encodeURIComponent(entityId);
+  const res = await fetch(`${API_V1}/projects/${id}/dependencies/entity/${encoded}`);
+  if (!res.ok) throw new Error('Failed to fetch entity dependencies');
+  return res.json();
+}
+
 
 
 

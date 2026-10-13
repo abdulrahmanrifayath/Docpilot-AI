@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import Column, String, Integer, Text, JSON, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, Float, Boolean, Text, JSON, DateTime, ForeignKey
 from sqlalchemy.orm import relationship, synonym
 
 from app.database.session import Base
@@ -54,6 +54,8 @@ class Project(Base):
     diagrams = relationship("Diagram", back_populates="project", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
     code_entities = relationship("CodeEntity", back_populates="project", cascade="all, delete-orphan")
+    dependency_nodes = relationship("DependencyNode", back_populates="project", cascade="all, delete-orphan")
+    dependency_relationships = relationship("DependencyRelationship", back_populates="project", cascade="all, delete-orphan")
 
 
 class CodeEntity(Base):
@@ -73,6 +75,43 @@ class CodeEntity(Base):
     created_at = Column(DateTime, default=utc_now)
 
     project = relationship("Project", back_populates="code_entities")
+
+
+class DependencyNode(Base):
+    __tablename__ = "dependency_nodes"
+
+    id = Column(String(100), primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    node_type = Column(String(50), nullable=False, index=True)  # file, module, class, function, service, external
+    file_path = Column(String(500), nullable=True, index=True)
+    entity_id = Column(String(36), nullable=True, index=True)
+    is_external = Column(Boolean, default=False, nullable=False, index=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="dependency_nodes")
+
+
+class DependencyRelationship(Base):
+    __tablename__ = "dependency_relationships"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(255), nullable=False, index=True)
+    target = Column(String(255), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, default="unknown")
+    target_type = Column(String(50), nullable=False, default="unknown")
+    relationship_type = Column(String(50), nullable=False, index=True)  # IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, USES
+    confidence = Column(Float, nullable=False, default=1.0)
+    is_external = Column(Boolean, default=False, nullable=False, index=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="dependency_relationships")
+
 
 
 class Document(Base):

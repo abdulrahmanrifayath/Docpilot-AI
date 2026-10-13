@@ -20,8 +20,9 @@ from app.core.exceptions import (
     GitCloneException,
 )
 from app.core.logging import logger
-from app.models.project import Project, CodeEntity, utc_now
+from app.models.project import Project, CodeEntity, DependencyNode, DependencyRelationship, utc_now
 from app.parsers.code_extractor import code_parsing_engine
+from app.services.dependency_analyzer import dependency_analyzer
 from app.schemas.project import (
     ProjectCreate,
     ProjectFileNode,
@@ -31,8 +32,14 @@ from app.schemas.project import (
     ProjectStatisticsResponse,
     ProjectScanResponse,
     ProjectParseResponse,
+    DependencyNodeResponse,
+    DependencyRelationshipResponse,
+    DependencyGraphResponse,
+    DependencyAnalysisResponse,
+    EntityDependenciesResponse,
 )
 from app.services.repository_scanner import repository_scanner
+
 
 
 
@@ -625,5 +632,219 @@ class ProjectService:
         return matched
 
 
+    async def analyze_dependencies(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> DependencyAnalysisResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if not base_path or not base_path.exists() or not base_path.is_dir():
+            raise ValidationException(
+                message="Project repository directory does not exist or has not been uploaded yet.",
+                details={"repository_path": project.repository_path if project else None},
+            )
+
+        # 1. Ensure code entities are extracted first
+        res_ents = await db.execute(select(CodeEntity).where(CodeEntity.project_id == project_id))
+        code_entities = list(res_ents.scalars().all())
+        if not code_entities:
+            await self.parse_project_code(project_id, db)
+            res_ents = await db.execute(select(CodeEntity).where(CodeEntity.project_id == project_id))
+            code_entities = list(res_ents.scalars().all())
+
+        # 2. Run StaticDependencyAnalyzer
+        nodes, relationships = dependency_analyzer.analyze_project(
+            project_id=project_id,
+            repository_path=base_path,
+            code_entities=code_entities,
+        )
+
+        # 3. Clear existing dependency records for this project
+        await db.execute(delete(DependencyRelationship).where(DependencyRelationship.project_id == project_id))
+        await db.execute(delete(DependencyNode).where(DependencyNode.project_id == project_id))
+
+        # 4. Save new nodes & relationships
+        if nodes:
+            db.add_all(nodes)
+        if relationships:
+            db.add_all(relationships)
+
+        await db.commit()
+
+        # 5. Compile breakdown stats
+        breakdown: Dict[str, int] = {
+            "IMPORTS": 0,
+            "CALLS": 0,
+            "EXTENDS": 0,
+            "IMPLEMENTS": 0,
+            "DEPENDS_ON": 0,
+            "USES": 0,
+        }
+        internal_count = 0
+        external_count = 0
+        for r in relationships:
+            breakdown[r.relationship_type] = breakdown.get(r.relationship_type, 0) + 1
+            if r.is_external:
+                external_count += 1
+            else:
+                internal_count += 1
+
+        logger.info(
+            f"Dependency analysis complete for project {project_id}: "
+            f"{len(nodes)} nodes, {len(relationships)} edges ({internal_count} internal, {external_count} external)"
+        )
+
+        return DependencyAnalysisResponse(
+            project_id=project.id,
+            status="ANALYZED",
+            total_nodes=len(nodes),
+            total_edges=len(relationships),
+            internal_dependencies=internal_count,
+            external_dependencies=external_count,
+            breakdown=breakdown,
+            analyzed_at=utc_now(),
+        )
+
+    async def get_dependencies(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        relationship_type: Optional[str] = None,
+        source: Optional[str] = None,
+        target: Optional[str] = None,
+        is_external: Optional[bool] = None,
+        min_confidence: Optional[float] = None,
+    ) -> List[DependencyRelationship]:
+        await self.get_project(project_id, db)
+        query = select(DependencyRelationship).where(DependencyRelationship.project_id == project_id)
+
+        if relationship_type:
+            query = query.where(DependencyRelationship.relationship_type == relationship_type.upper())
+        if source:
+            query = query.where(DependencyRelationship.source.ilike(f"%{source}%"))
+        if target:
+            query = query.where(DependencyRelationship.target.ilike(f"%{target}%"))
+        if is_external is not None:
+            query = query.where(DependencyRelationship.is_external == is_external)
+        if min_confidence is not None:
+            query = query.where(DependencyRelationship.confidence >= min_confidence)
+
+        query = query.order_by(DependencyRelationship.confidence.desc(), DependencyRelationship.source.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_dependency_graph(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> DependencyGraphResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+
+        # Fetch existing nodes and relationships
+        nodes_res = await db.execute(select(DependencyNode).where(DependencyNode.project_id == project_id))
+        nodes = list(nodes_res.scalars().all())
+
+        edges_res = await db.execute(select(DependencyRelationship).where(DependencyRelationship.project_id == project_id))
+        edges = list(edges_res.scalars().all())
+
+        # If empty and project files exist, run analysis automatically
+        if (not nodes or not edges) and base_path and base_path.exists():
+            await self.analyze_dependencies(project_id, db)
+            nodes_res = await db.execute(select(DependencyNode).where(DependencyNode.project_id == project_id))
+            nodes = list(nodes_res.scalars().all())
+            edges_res = await db.execute(select(DependencyRelationship).where(DependencyRelationship.project_id == project_id))
+            edges = list(edges_res.scalars().all())
+
+        node_types: Dict[str, int] = {}
+        for n in nodes:
+            node_types[n.node_type] = node_types.get(n.node_type, 0) + 1
+
+        rel_types: Dict[str, int] = {}
+        for e in edges:
+            rel_types[e.relationship_type] = rel_types.get(e.relationship_type, 0) + 1
+
+        stats = {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "node_types": node_types,
+            "relationship_types": rel_types,
+        }
+
+        return DependencyGraphResponse(
+            project_id=project.id,
+            nodes=[DependencyNodeResponse.model_validate(n) for n in nodes],
+            edges=[DependencyRelationshipResponse.model_validate(e) for e in edges],
+            stats=stats,
+        )
+
+    async def get_entity_dependencies(
+        self,
+        project_id: str,
+        entity_id: str,
+        db: AsyncSession,
+    ) -> EntityDependenciesResponse:
+        await self.get_project(project_id, db)
+
+        # 1. Find matching node
+        node_query = select(DependencyNode).where(
+            DependencyNode.project_id == project_id,
+            (DependencyNode.id == entity_id) |
+            (DependencyNode.name == entity_id) |
+            (DependencyNode.entity_id == entity_id)
+        )
+        node_res = await db.execute(node_query)
+        target_node = node_res.scalar_one_or_none()
+
+        entity_name = target_node.name if target_node else entity_id
+
+        # 2. Find incoming edges (edges where target == entity_name or target == entity_id)
+        incoming_query = select(DependencyRelationship).where(
+            DependencyRelationship.project_id == project_id,
+            (DependencyRelationship.target == entity_name) |
+            (DependencyRelationship.target == entity_id)
+        )
+        inc_res = await db.execute(incoming_query)
+        incoming_edges = list(inc_res.scalars().all())
+
+        # 3. Find outgoing edges (edges where source == entity_name or source == entity_id)
+        outgoing_query = select(DependencyRelationship).where(
+            DependencyRelationship.project_id == project_id,
+            (DependencyRelationship.source == entity_name) |
+            (DependencyRelationship.source == entity_id)
+        )
+        out_res = await db.execute(outgoing_query)
+        outgoing_edges = list(out_res.scalars().all())
+
+        # 4. Find neighbor nodes
+        neighbor_names = set()
+        for e in incoming_edges:
+            neighbor_names.add(e.source)
+        for e in outgoing_edges:
+            neighbor_names.add(e.target)
+
+        neighbors: List[DependencyNode] = []
+        if neighbor_names:
+            neighbors_res = await db.execute(
+                select(DependencyNode).where(
+                    DependencyNode.project_id == project_id,
+                    (DependencyNode.name.in_(neighbor_names) | DependencyNode.id.in_(neighbor_names))
+                )
+            )
+            neighbors = list(neighbors_res.scalars().all())
+
+        return EntityDependenciesResponse(
+            project_id=project_id,
+            entity_id=entity_id,
+            entity_name=entity_name,
+            node=DependencyNodeResponse.model_validate(target_node) if target_node else None,
+            incoming=[DependencyRelationshipResponse.model_validate(e) for e in incoming_edges],
+            outgoing=[DependencyRelationshipResponse.model_validate(e) for e in outgoing_edges],
+            neighbors=[DependencyNodeResponse.model_validate(n) for n in neighbors],
+        )
+
+
 project_service = ProjectService()
+
 

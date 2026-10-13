@@ -142,3 +142,60 @@ class ProjectParseResponse(BaseModel):
     parsed_at: datetime
 
 
+class DependencyNodeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    project_id: str
+    name: str
+    node_type: str  # file, module, class, function, service, external
+    file_path: Optional[str] = None
+    entity_id: Optional[str] = None
+    is_external: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+
+class DependencyRelationshipResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    project_id: str
+    source: str
+    target: str
+    source_type: str = "unknown"
+    target_type: str = "unknown"
+    relationship_type: str  # IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, USES
+    confidence: float = 1.0
+    is_external: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+
+class DependencyGraphResponse(BaseModel):
+    project_id: str
+    nodes: List[DependencyNodeResponse] = Field(default_factory=list)
+    edges: List[DependencyRelationshipResponse] = Field(default_factory=list)
+    stats: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DependencyAnalysisResponse(BaseModel):
+    project_id: str
+    status: str
+    total_nodes: int
+    total_edges: int
+    internal_dependencies: int
+    external_dependencies: int
+    breakdown: Dict[str, int] = Field(default_factory=dict)
+    analyzed_at: datetime
+
+
+class EntityDependenciesResponse(BaseModel):
+    project_id: str
+    entity_id: str
+    entity_name: str
+    node: Optional[DependencyNodeResponse] = None
+    incoming: List[DependencyRelationshipResponse] = Field(default_factory=list)
+    outgoing: List[DependencyRelationshipResponse] = Field(default_factory=list)
+    neighbors: List[DependencyNodeResponse] = Field(default_factory=list)
+
+
+

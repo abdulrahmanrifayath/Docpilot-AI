@@ -14,8 +14,14 @@ from app.schemas.project import (
     ProjectScanResponse,
     CodeEntityResponse,
     ProjectParseResponse,
+    DependencyNodeResponse,
+    DependencyRelationshipResponse,
+    DependencyGraphResponse,
+    DependencyAnalysisResponse,
+    EntityDependenciesResponse,
 )
 from app.services.project_service import project_service
+
 
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -200,5 +206,64 @@ async def list_file_entities(
         db=db,
     )
     return entities
+
+
+@router.post("/{project_id}/dependencies/analyze", response_model=DependencyAnalysisResponse)
+async def analyze_project_dependencies(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DependencyAnalysisResponse:
+    """Analyze static dependencies, imports, class inheritance, calls, and external packages."""
+    result = await project_service.analyze_dependencies(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/dependencies", response_model=List[DependencyRelationshipResponse])
+async def list_project_dependencies(
+    project_id: str,
+    relationship_type: Optional[str] = Query(None, description="Filter by relationship type (IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, USES)"),
+    source: Optional[str] = Query(None, description="Filter by source node or entity name"),
+    target: Optional[str] = Query(None, description="Filter by target node or entity name"),
+    is_external: Optional[bool] = Query(None, description="Filter by external or internal dependency"),
+    min_confidence: Optional[float] = Query(None, description="Filter by minimum confidence score (0.0 - 1.0)"),
+    db: AsyncSession = Depends(get_db),
+) -> List[DependencyRelationshipResponse]:
+    """Retrieve flat list of detected dependencies and relationships with confidence scores."""
+    dependencies = await project_service.get_dependencies(
+        project_id=project_id,
+        db=db,
+        relationship_type=relationship_type,
+        source=source,
+        target=target,
+        is_external=is_external,
+        min_confidence=min_confidence,
+    )
+    return dependencies
+
+
+@router.get("/{project_id}/dependencies/graph", response_model=DependencyGraphResponse)
+async def get_project_dependency_graph(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DependencyGraphResponse:
+    """Retrieve complete graph structure with nodes, edges, metadata, and statistics for React Flow."""
+    graph = await project_service.get_dependency_graph(project_id, db)
+    return graph
+
+
+@router.get("/{project_id}/dependencies/entity/{entity_id}", response_model=EntityDependenciesResponse)
+async def get_entity_dependencies(
+    project_id: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> EntityDependenciesResponse:
+    """Retrieve inbound and outbound dependencies and neighbor nodes for a specific entity or node."""
+    result = await project_service.get_entity_dependencies(
+        project_id=project_id,
+        entity_id=entity_id,
+        db=db,
+    )
+    return result
+
 
 

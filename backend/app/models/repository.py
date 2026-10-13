@@ -5,7 +5,19 @@ from app.models.project import (
     ChatMessage,
     Repository,
     CodeEntity,
+    DependencyNode,
+    DependencyRelationship,
 )
 
-__all__ = ["Project", "Document", "Diagram", "ChatMessage", "Repository", "CodeEntity"]
+__all__ = [
+    "Project",
+    "Document",
+    "Diagram",
+    "ChatMessage",
+    "Repository",
+    "CodeEntity",
+    "DependencyNode",
+    "DependencyRelationship",
+]
+
 

@@ -35,6 +35,8 @@ import {
   Braces,
   Hash,
   Sparkles,
+  Workflow,
+  Network,
 } from 'lucide-react';
 import {
   Project,
@@ -45,6 +47,7 @@ import {
   CodeEntity,
   CodeEntityType,
   ProjectParseResponse,
+  DependencyGraphResponse,
 } from '../types';
 import {
   fetchProject,
@@ -55,10 +58,13 @@ import {
   parseProjectCode,
   fetchFileEntities,
   fetchProjectEntities,
+  fetchDependencyGraph,
+  analyzeDependencies,
   uploadProjectZip,
   cloneProjectGit,
   deleteProject,
 } from '../api/client';
+import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -235,6 +241,9 @@ export const ProjectDetailsPage: React.FC = () => {
   const [parsing, setParsing] = useState<boolean>(false);
   const [parseSuccess, setParseSuccess] = useState<boolean>(false);
   const [parseSummary, setParseSummary] = useState<ProjectParseResponse | null>(null);
+  const [depGraphData, setDepGraphData] = useState<DependencyGraphResponse | null>(null);
+  const [analyzingDeps, setAnalyzingDeps] = useState<boolean>(false);
+  const [analyzeDepsSuccess, setAnalyzeDepsSuccess] = useState<boolean>(false);
   const [fileEntities, setFileEntities] = useState<CodeEntity[]>([]);
   const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
   const [entityFilter, setEntityFilter] = useState<string>('ALL');
@@ -255,12 +264,13 @@ export const ProjectDetailsPage: React.FC = () => {
   const loadAllData = async (projId: string) => {
     try {
       setLoading(true);
-      const [proj, struct, tech, stats, allEntities] = await Promise.all([
+      const [proj, struct, tech, stats, allEntities, graph] = await Promise.all([
         fetchProject(projId),
         fetchProjectStructure(projId).catch(() => null),
         fetchProjectTechnologies(projId).catch(() => null),
         fetchProjectStatistics(projId).catch(() => null),
         fetchProjectEntities(projId).catch(() => []),
+        fetchDependencyGraph(projId).catch(() => null),
       ]);
 
       setProject(proj);
@@ -269,6 +279,7 @@ export const ProjectDetailsPage: React.FC = () => {
       setTechData(tech);
       setStatsData(stats);
       setTotalEntitiesCount(allEntities.length);
+      setDepGraphData(graph);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load project details');
     } finally {
@@ -331,6 +342,25 @@ export const ProjectDetailsPage: React.FC = () => {
       alert(`Code parsing failed: ${err.message || err}`);
     } finally {
       setParsing(false);
+    }
+  };
+
+  const handleAnalyzeDependencies = async () => {
+    if (!project) return;
+    setAnalyzingDeps(true);
+    setAnalyzeDepsSuccess(false);
+    try {
+      await analyzeDependencies(project.id);
+      const graph = await fetchDependencyGraph(project.id);
+      setDepGraphData(graph);
+      setAnalyzeDepsSuccess(true);
+      await loadAllData(project.id);
+      await refreshProjects();
+      setTimeout(() => setAnalyzeDepsSuccess(false), 4000);
+    } catch (err: any) {
+      alert(`Dependency analysis failed: ${err.message || err}`);
+    } finally {
+      setAnalyzingDeps(false);
     }
   };
 
@@ -495,6 +525,27 @@ export const ProjectDetailsPage: React.FC = () => {
             <span>{parsing ? 'Parsing AST...' : parseSuccess ? 'Code Parsed' : 'Parse Code'}</span>
           </button>
 
+          {/* Analyze Dependencies Button */}
+          <button
+            onClick={handleAnalyzeDependencies}
+            disabled={analyzingDeps || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              analyzeDepsSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-teal-600 hover:bg-teal-500 text-white shadow-teal-600/25'
+            } disabled:opacity-50`}
+            title="Detect file imports, module calls, inheritance, and dependency topology"
+          >
+            {analyzingDeps ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : analyzeDepsSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Workflow className="w-3.5 h-3.5" />
+            )}
+            <span>{analyzingDeps ? 'Analyzing Graph...' : analyzeDepsSuccess ? 'Graph Analyzed' : 'Analyze Dependencies'}</span>
+          </button>
+
           <button
             onClick={() => id && loadAllData(id)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
@@ -550,7 +601,7 @@ export const ProjectDetailsPage: React.FC = () => {
           <Activity className="w-3.5 h-3.5 text-brand-400" />
           <span>Project Overview & Discovery Metrics</span>
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Files</span>
             <p className="text-2xl font-extrabold text-white mt-1">{totalFiles.toLocaleString()}</p>
@@ -577,6 +628,18 @@ export const ProjectDetailsPage: React.FC = () => {
             </span>
             <p className="text-2xl font-extrabold text-indigo-300 mt-1">{totalEntitiesCount.toLocaleString()}</p>
             <span className="text-[10px] text-slate-500 block mt-1">AST classes, methods, functions</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+              Dependency Graph
+            </span>
+            <p className="text-2xl font-extrabold text-emerald-300 mt-1">
+              {(depGraphData?.edges?.length || 0).toLocaleString()}
+            </p>
+            <span className="text-[10px] text-slate-500 block mt-1">
+              {depGraphData?.nodes?.length || 0} nodes · Edges detected
+            </span>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
@@ -1039,6 +1102,36 @@ export const ProjectDetailsPage: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* SECTION 4: COMPONENT DEPENDENCIES & RELATIONSHIP TOPOLOGY GRAPH (PHASE 5) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Workflow className="w-4 h-4 text-emerald-400" />
+              <span>Component Dependencies & Architecture Topology</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Interactive React Flow graph with static analysis detected relationships (Imports, Calls, Extends, Implements, Depends On).
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/diagrams"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all border border-slate-700"
+            >
+              <span>View in Diagrams</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        <DependencyGraphViewer
+          graphData={depGraphData}
+          onRefresh={() => id && loadAllData(id)}
+          isLoading={analyzingDeps}
+        />
       </div>
     </div>
   );

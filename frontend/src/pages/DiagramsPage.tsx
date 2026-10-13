@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Workflow,
@@ -11,12 +11,53 @@ import {
   ZoomIn,
   ZoomOut,
   GitFork,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  Share2,
 } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
+import { fetchDependencyGraph, analyzeDependencies } from '../api/client';
+import { DependencyGraphResponse } from '../types';
+import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
 
 export const DiagramsPage: React.FC = () => {
   const { activeProject } = useProjects();
-  const [selectedDiagram, setSelectedDiagram] = useState<string>('architecture');
+  const [selectedDiagram, setSelectedDiagram] = useState<string>('dependencies');
+  const [graphData, setGraphData] = useState<DependencyGraphResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [analyzing, setAnalyzing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activeProject?.id) {
+      loadGraph(activeProject.id);
+    }
+  }, [activeProject?.id]);
+
+  const loadGraph = async (projId: string) => {
+    setLoading(true);
+    try {
+      const data = await fetchDependencyGraph(projId);
+      setGraphData(data);
+    } catch (err) {
+      console.warn('Failed to load dependency graph:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!activeProject?.id) return;
+    setAnalyzing(true);
+    try {
+      await analyzeDependencies(activeProject.id);
+      await loadGraph(activeProject.id);
+    } catch (err: any) {
+      alert(`Dependency analysis failed: ${err.message || err}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   if (!activeProject) {
     return (
@@ -40,8 +81,8 @@ export const DiagramsPage: React.FC = () => {
   }
 
   const diagramTypes = [
+    { id: 'dependencies', name: 'Component Dependencies', icon: Layers, desc: 'Interactive React Flow entity & dependency graph' },
     { id: 'architecture', name: 'High-Level Architecture', icon: Workflow, desc: 'Overall system layout & services' },
-    { id: 'dependencies', name: 'Component Dependencies', icon: Layers, desc: 'Module & package graph' },
     { id: 'er', name: 'Entity Relationship (ER)', icon: Database, desc: 'Data models & schema relations' },
     { id: 'sequence', name: 'Request Lifecycle', icon: GitFork, desc: 'End-to-end request sequence' },
   ];
@@ -52,26 +93,24 @@ export const DiagramsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">System Architecture & Diagrams</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">System Architecture & Dependencies</h1>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               {activeProject.name}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Visual representations of code organization, service relationships, and database models
+            Static analysis detected relations, imports, function calls, class inheritance, and dependency topology.
           </p>
         </div>
-      </div>
-
-      {/* Phase 4 Notice */}
-      <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-start gap-3">
-        <Info className="w-5 h-5 shrink-0 text-indigo-400 mt-0.5" />
-        <div>
-          <h4 className="font-bold text-white mb-0.5">Architecture Visualization Engine</h4>
-          <p className="text-indigo-200/90 leading-relaxed">
-            Automatic interactive ReactFlow graph generation and Mermaid syntax compilation will be hooked up in Phase
-            4. Below is the interactive workbench canvas.
-          </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-brand-600/20 transition-all"
+          >
+            {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            <span>{analyzing ? 'Analyzing Dependencies...' : 'Analyze Dependencies'}</span>
+          </button>
         </div>
       </div>
 
@@ -102,45 +141,60 @@ export const DiagramsPage: React.FC = () => {
         })}
       </div>
 
-      {/* Canvas Workspace */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 min-h-[420px] flex flex-col justify-between">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
-            <span>Visual Canvas:</span>
-            <span className="capitalize font-bold text-white">{selectedDiagram.replace('-', ' ')}</span>
-          </div>
-          <div className="flex items-center gap-2 text-slate-400">
-            <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Zoom In">
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Zoom Out">
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Fullscreen">
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
+      {/* Main Canvas Area */}
+      {selectedDiagram === 'dependencies' ? (
+        <div className="space-y-4">
+          <DependencyGraphViewer
+            graphData={graphData}
+            onRefresh={() => loadGraph(activeProject.id)}
+            isLoading={loading || analyzing}
+          />
         </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 min-h-[460px] flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <span>Visual Canvas:</span>
+              <span className="capitalize font-bold text-white">{selectedDiagram.replace('-', ' ')}</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-400">
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Zoom In">
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Zoom Out">
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors" title="Fullscreen">
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
-        {/* Mock Canvas View */}
-        <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-brand-400 mb-3 shadow-inner">
-            <Workflow className="w-8 h-8" />
+          <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-brand-400 mb-3 shadow-inner">
+              <Share2 className="w-8 h-8" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1">
+              {activeProject.name} — {selectedDiagram.toUpperCase()} Diagram View
+            </h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">
+              Switch to "Component Dependencies" to interact with the full React Flow node-edge graph parsed from repository source code.
+            </p>
+            <button
+              onClick={() => setSelectedDiagram('dependencies')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-medium transition-all"
+            >
+              <Layers className="w-4 h-4" />
+              <span>View Component Dependencies Graph</span>
+            </button>
           </div>
-          <h3 className="text-sm font-bold text-white mb-1">
-            {activeProject.name} — Visual Diagram Ready for Phase 4
-          </h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Repository files are cataloged in sandbox isolation. Phase 4 will parse dependencies to generate high-fidelity
-            Mermaid and ReactFlow interactive network diagrams.
-          </p>
-        </div>
 
-        <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-          <span>Renderer: Mermaid 10.x & ReactFlow 11.x</span>
-          <span>Status: Schema Ready</span>
+          <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Renderer: React Flow & Directed Graph Engine</span>
+            <span>Status: Ready</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
