@@ -235,6 +235,73 @@ export interface APIAnalysisResponse {
   analyzed_at: string;
 }
 
+// =============================================================================
+// PHASE 7: DATABASE STRUCTURE ANALYSIS TYPES
+// =============================================================================
+
+export type DatabaseRelationshipType =
+  | 'ONE_TO_ONE'
+  | 'ONE_TO_MANY'
+  | 'MANY_TO_MANY'
+  | 'FOREIGN_KEY';
+
+export interface DatabaseField {
+  id: string;
+  name: string;
+  data_type: string;
+  is_primary_key: boolean;
+  is_foreign_key: boolean;
+  foreign_key_target?: string | null;
+  is_nullable: boolean;
+  default_value?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface DatabaseRelationship {
+  id: string;
+  project_id: string;
+  source_model: string;
+  target_model: string;
+  relationship_type: DatabaseRelationshipType | string;
+  foreign_key_field?: string | null;
+  back_populates?: string | null;
+  secondary_table?: string | null;
+  description?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface DatabaseModel {
+  id: string;
+  project_id: string;
+  name: string;
+  table_name: string;
+  file_path: string;
+  orm_type: string;
+  start_line: number;
+  fields: DatabaseField[];
+  metadata?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface DatabaseAnalysisResponse {
+  project_id: string;
+  status: string;
+  total_models: number;
+  total_fields: number;
+  total_relationships: number;
+  orm_breakdown: Record<string, number>;
+  models: DatabaseModel[];
+  relationships: DatabaseRelationship[];
+  analyzed_at: string;
+}
+
+export interface DatabaseDiagramResponse {
+  project_id: string;
+  mermaid_code: string;
+  total_models: number;
+  total_relationships: number;
+}
+
 export interface ProjectCreatePayload {
   name: string;
   description?: string;
@@ -357,4 +424,93 @@ export interface PipelineProgress {
   progress_percent?: number;
   error_message?: string;
 }
+
+// =============================================================================
+// PHASE 8: UNIFIED PROJECT KNOWLEDGE GRAPH TYPES
+// =============================================================================
+
+export type KnowledgeNodeType =
+  | 'folder'
+  | 'file'
+  | 'module'
+  | 'class'
+  | 'function'
+  | 'method'
+  | 'interface'
+  | 'component'
+  | 'service'
+  | 'api'
+  | 'database'
+  | 'dependency'
+  | string;
+
+export interface KnowledgeNode {
+  id: string;
+  project_id: string;
+  name: string;
+  label: string;
+  node_type: KnowledgeNodeType;
+  file_path?: string | null;
+  entity_id?: string | null;
+  metadata?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface KnowledgeEdge {
+  id: string;
+  project_id: string;
+  source: string;
+  target: string;
+  source_id?: string;
+  target_id?: string;
+  source_name: string;
+  target_name: string;
+  source_type: string;
+  target_type: string;
+  relationship_type: string;
+  confidence: number;
+  metadata?: Record<string, any>;
+}
+
+export interface KnowledgeGraphStats {
+  total_nodes: number;
+  total_edges: number;
+  node_types: Record<string, number>;
+  relationship_types: Record<string, number>;
+}
+
+export interface KnowledgeGraphResponse {
+  project_id: string;
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  stats: KnowledgeGraphStats;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  focus_id?: string | null;
+  depth?: number | null;
+}
+
+export interface KnowledgeBuildResponse {
+  project_id: string;
+  status: string;
+  total_nodes: number;
+  total_edges: number;
+  node_types: Record<string, number>;
+  relationship_types: Record<string, number>;
+  built_at: string;
+}
+
+export interface KnowledgeEntityDetailResponse {
+  entity: KnowledgeNode;
+  incoming_edges: KnowledgeEdge[];
+  outgoing_edges: KnowledgeEdge[];
+  connected_apis: KnowledgeNode[];
+  connected_database_models: KnowledgeNode[];
+  dependencies: KnowledgeNode[];
+  dependents: KnowledgeNode[];
+  neighborhood_nodes: KnowledgeNode[];
+  neighborhood_edges: KnowledgeEdge[];
+}
+
 

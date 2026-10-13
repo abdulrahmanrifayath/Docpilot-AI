@@ -57,6 +57,10 @@ class Project(Base):
     dependency_nodes = relationship("DependencyNode", back_populates="project", cascade="all, delete-orphan")
     dependency_relationships = relationship("DependencyRelationship", back_populates="project", cascade="all, delete-orphan")
     api_endpoints = relationship("APIEndpoint", back_populates="project", cascade="all, delete-orphan")
+    database_models = relationship("DatabaseModel", back_populates="project", cascade="all, delete-orphan")
+    database_relationships = relationship("DatabaseRelationship", back_populates="project", cascade="all, delete-orphan")
+    knowledge_nodes = relationship("KnowledgeNode", back_populates="project", cascade="all, delete-orphan")
+    knowledge_edges = relationship("KnowledgeEdge", back_populates="project", cascade="all, delete-orphan")
 
 
 class CodeEntity(Base):
@@ -133,6 +137,100 @@ class APIEndpoint(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     project = relationship("Project", back_populates="api_endpoints")
+
+
+class DatabaseModel(Base):
+    __tablename__ = "database_models"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    table_name = Column(String(255), nullable=False, index=True)
+    file_path = Column(String(500), nullable=False, index=True)
+    orm_type = Column(String(50), nullable=False, default="SQLAlchemy", index=True)  # SQLAlchemy, Django, SQL
+    start_line = Column(Integer, nullable=False, default=1)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    project = relationship("Project", back_populates="database_models")
+    fields = relationship("DatabaseField", back_populates="model", cascade="all, delete-orphan", lazy="selectin")
+
+
+class DatabaseField(Base):
+    __tablename__ = "database_fields"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    model_id = Column(String(36), ForeignKey("database_models.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    data_type = Column(String(100), nullable=False, default="String")
+    is_primary_key = Column(Boolean, default=False, nullable=False)
+    is_foreign_key = Column(Boolean, default=False, nullable=False)
+    foreign_key_target = Column(String(255), nullable=True)
+    is_nullable = Column(Boolean, default=True, nullable=False)
+    default_value = Column(String(255), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    model = relationship("DatabaseModel", back_populates="fields")
+
+
+class DatabaseRelationship(Base):
+    __tablename__ = "database_model_relationships"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_model = Column(String(255), nullable=False, index=True)
+    target_model = Column(String(255), nullable=False, index=True)
+    relationship_type = Column(String(50), nullable=False, index=True)  # ONE_TO_ONE, ONE_TO_MANY, MANY_TO_MANY, FOREIGN_KEY
+    foreign_key_field = Column(String(255), nullable=True)
+    back_populates = Column(String(255), nullable=True)
+    secondary_table = Column(String(255), nullable=True)
+    description = Column(String(255), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="database_relationships")
+
+
+class KnowledgeNode(Base):
+    __tablename__ = "knowledge_nodes"
+
+    id = Column(String(500), primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    label = Column(String(255), nullable=False)
+    node_type = Column(String(50), nullable=False, index=True)  # folder, file, module, class, function, api, database, service, external
+    file_path = Column(String(500), nullable=True, index=True)
+    entity_id = Column(String(100), nullable=True, index=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="knowledge_nodes")
+
+
+class KnowledgeEdge(Base):
+    __tablename__ = "knowledge_edges"
+
+    id = Column(String(100), primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_id = Column(String(500), nullable=False, index=True)
+    target_id = Column(String(500), nullable=False, index=True)
+    source_name = Column(String(255), nullable=False, index=True)
+    target_name = Column(String(255), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False)
+    target_type = Column(String(50), nullable=False)
+    relationship_type = Column(String(50), nullable=False, index=True)  # CONTAINS, IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, DEFINES_API, HANDLES_API, QUERIES_DB, MAPS_TO_TABLE, RELATIONSHIP_WITH, USES
+    confidence = Column(Float, nullable=False, default=1.0)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="knowledge_edges")
 
 
 class Document(Base):

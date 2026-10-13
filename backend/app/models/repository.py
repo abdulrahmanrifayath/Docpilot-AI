@@ -8,6 +8,11 @@ from app.models.project import (
     DependencyNode,
     DependencyRelationship,
     APIEndpoint,
+    DatabaseModel,
+    DatabaseField,
+    DatabaseRelationship,
+    KnowledgeNode,
+    KnowledgeEdge,
 )
 
 __all__ = [
@@ -20,6 +25,11 @@ __all__ = [
     "DependencyNode",
     "DependencyRelationship",
     "APIEndpoint",
+    "DatabaseModel",
+    "DatabaseField",
+    "DatabaseRelationship",
+    "KnowledgeNode",
+    "KnowledgeEdge",
 ]
 
 

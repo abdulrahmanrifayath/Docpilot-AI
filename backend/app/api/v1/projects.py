@@ -22,6 +22,13 @@ from app.schemas.project import (
     APIEndpointResponse,
     APIEndpointDetailResponse,
     APIAnalysisResponse,
+    DatabaseModelResponse,
+    DatabaseRelationshipResponse,
+    DatabaseAnalysisResponse,
+    DatabaseDiagramResponse,
+    KnowledgeBuildResponse,
+    KnowledgeGraphResponse,
+    KnowledgeEntityDetailResponse,
 )
 from app.services.project_service import project_service
 
@@ -317,6 +324,114 @@ async def get_project_api_endpoint(
         db=db,
     )
     return endpoint
+
+
+# =============================================================================
+# PHASE 7: DATABASE STRUCTURE ANALYSIS
+# =============================================================================
+
+@router.post("/{project_id}/database/analyze", response_model=DatabaseAnalysisResponse)
+async def analyze_project_database(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DatabaseAnalysisResponse:
+    """Statically analyze database models, fields, and relationships from SQLAlchemy, Django ORM, and SQL schemas."""
+    return await project_service.analyze_database(project_id, db)
+
+
+@router.get("/{project_id}/database/models", response_model=List[DatabaseModelResponse])
+async def list_project_database_models(
+    project_id: str,
+    orm_type: Optional[str] = Query(None, description="Filter by ORM type (SQLAlchemy, Django, SQL)"),
+    search: Optional[str] = Query(None, description="Search model name, table name, or file path"),
+    db: AsyncSession = Depends(get_db),
+) -> List[DatabaseModelResponse]:
+    """Retrieve list of detected database models with fields, types, and primary/foreign keys."""
+    models = await project_service.get_database_models(
+        project_id=project_id,
+        db=db,
+        orm_type=orm_type,
+        search=search,
+    )
+    return [DatabaseModelResponse.model_validate(m) for m in models]
+
+
+@router.get("/{project_id}/database/relationships", response_model=List[DatabaseRelationshipResponse])
+async def list_project_database_relationships(
+    project_id: str,
+    model_name: Optional[str] = Query(None, description="Filter by source or target model name"),
+    relationship_type: Optional[str] = Query(None, description="Filter by relationship type (ONE_TO_ONE, ONE_TO_MANY, MANY_TO_MANY, FOREIGN_KEY)"),
+    db: AsyncSession = Depends(get_db),
+) -> List[DatabaseRelationshipResponse]:
+    """Retrieve list of relationships between database entities."""
+    relationships = await project_service.get_database_relationships(
+        project_id=project_id,
+        db=db,
+        model_name=model_name,
+        relationship_type=relationship_type,
+    )
+    return [DatabaseRelationshipResponse.model_validate(r) for r in relationships]
+
+
+@router.get("/{project_id}/database/diagram", response_model=DatabaseDiagramResponse)
+async def get_project_database_diagram(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> DatabaseDiagramResponse:
+    """Generate Mermaid ER diagram syntax for project database models and relationships."""
+    return await project_service.get_database_diagram(project_id, db)
+
+
+# =============================================================================
+# PHASE 8: UNIFIED PROJECT KNOWLEDGE GRAPH
+# =============================================================================
+
+@router.post("/{project_id}/knowledge/build", response_model=KnowledgeBuildResponse)
+async def build_project_knowledge_graph(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeBuildResponse:
+    """Combine results from scanner, code parser, dependency analyzer, API discovery, and database analyzer into a unified knowledge model."""
+    return await project_service.build_knowledge_graph(project_id, db)
+
+
+@router.get("/{project_id}/knowledge/graph", response_model=KnowledgeGraphResponse)
+async def get_project_knowledge_graph(
+    project_id: str,
+    node_types: Optional[str] = Query(None, description="Comma-separated node types (e.g. file,class,api,database,service)"),
+    search: Optional[str] = Query(None, description="Filter nodes by name or label"),
+    focus_id: Optional[str] = Query(None, description="Focus entity ID or name for neighborhood subgraph traversal"),
+    depth: int = Query(2, ge=1, le=5, description="Depth radius around focus entity"),
+    limit: int = Query(150, ge=1, le=500, description="Max nodes to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeGraphResponse:
+    """Retrieve the unified project knowledge graph with filtering, search, focus mode, and pagination."""
+    types_list = [t.strip() for t in node_types.split(",") if t.strip()] if node_types else None
+    return await project_service.get_knowledge_graph(
+        project_id=project_id,
+        db=db,
+        node_types=types_list,
+        search=search,
+        focus_id=focus_id,
+        depth=depth,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/{project_id}/knowledge/entity/{entity_id:path}", response_model=KnowledgeEntityDetailResponse)
+async def get_project_knowledge_entity_detail(
+    project_id: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeEntityDetailResponse:
+    """Query entity knowledge details: what uses it, what it uses, connected APIs, and connected database models."""
+    return await project_service.get_entity_knowledge(
+        project_id=project_id,
+        entity_id=entity_id,
+        db=db,
+    )
 
 
 

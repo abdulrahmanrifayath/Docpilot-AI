@@ -16,6 +16,15 @@ import {
   APIEndpoint,
   APIEndpointDetail,
   APIAnalysisResponse,
+  DatabaseModel,
+  DatabaseRelationship,
+  DatabaseAnalysisResponse,
+  DatabaseDiagramResponse,
+  KnowledgeNode,
+  KnowledgeEdge,
+  KnowledgeGraphResponse,
+  KnowledgeBuildResponse,
+  KnowledgeEntityDetailResponse,
   SystemStatus,
   DocumentItem,
   DiagramItem,
@@ -259,6 +268,112 @@ export async function fetchProjectApiDetail(
   if (!res.ok) throw new Error('Failed to fetch API endpoint details');
   return res.json();
 }
+
+// Phase 7: Database Structure Analysis
+export async function analyzeProjectDatabase(id: string): Promise<DatabaseAnalysisResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/database/analyze`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Database structure analysis failed' } }));
+    throw new Error(err.error?.message || 'Database structure analysis failed');
+  }
+  return res.json();
+}
+
+export async function fetchDatabaseModels(
+  id: string,
+  options?: { orm_type?: string; search?: string }
+): Promise<DatabaseModel[]> {
+  const params = new URLSearchParams();
+  if (options?.orm_type) params.append('orm_type', options.orm_type);
+  if (options?.search) params.append('search', options.search);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/database/models${query}`);
+  if (!res.ok) throw new Error('Failed to fetch database models');
+  return res.json();
+}
+
+export async function fetchDatabaseRelationships(
+  id: string,
+  options?: { model_name?: string; relationship_type?: string }
+): Promise<DatabaseRelationship[]> {
+  const params = new URLSearchParams();
+  if (options?.model_name) params.append('model_name', options.model_name);
+  if (options?.relationship_type) params.append('relationship_type', options.relationship_type);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/database/relationships${query}`);
+  if (!res.ok) throw new Error('Failed to fetch database relationships');
+  return res.json();
+}
+
+export async function fetchDatabaseDiagram(id: string): Promise<DatabaseDiagramResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/database/diagram`);
+  if (!res.ok) throw new Error('Failed to fetch database ER diagram');
+  return res.json();
+}
+
+// =============================================================================
+// PHASE 8: UNIFIED PROJECT KNOWLEDGE GRAPH CLIENT
+// =============================================================================
+
+export async function buildKnowledgeGraph(id: string): Promise<KnowledgeBuildResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/knowledge/build`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error('Failed to build unified project knowledge graph');
+  return res.json();
+}
+
+export async function fetchKnowledgeGraph(
+  id: string,
+  options?: {
+    node_types?: string[];
+    search?: string;
+    focus_id?: string;
+    depth?: number;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<KnowledgeGraphResponse> {
+  const params = new URLSearchParams();
+  if (options?.node_types && options.node_types.length > 0) {
+    params.set('node_types', options.node_types.join(','));
+  }
+  if (options?.search) {
+    params.set('search', options.search);
+  }
+  if (options?.focus_id) {
+    params.set('focus_id', options.focus_id);
+  }
+  if (options?.depth !== undefined) {
+    params.set('depth', String(options.depth));
+  }
+  if (options?.limit !== undefined) {
+    params.set('limit', String(options.limit));
+  }
+  if (options?.offset !== undefined) {
+    params.set('offset', String(options.offset));
+  }
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/knowledge/graph${query}`);
+  if (!res.ok) throw new Error('Failed to fetch project knowledge graph');
+  return res.json();
+}
+
+export async function fetchKnowledgeEntityDetail(
+  id: string,
+  entityId: string
+): Promise<KnowledgeEntityDetailResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/knowledge/entity/${encodeURIComponent(entityId)}`);
+  if (!res.ok) throw new Error('Failed to fetch entity knowledge detail');
+  return res.json();
+}
+
 
 
 

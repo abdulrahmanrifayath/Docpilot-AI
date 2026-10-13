@@ -20,10 +20,23 @@ from app.core.exceptions import (
     GitCloneException,
 )
 from app.core.logging import logger
-from app.models.project import Project, CodeEntity, DependencyNode, DependencyRelationship, APIEndpoint, utc_now
+from app.models.project import (
+    Project,
+    CodeEntity,
+    DependencyNode,
+    DependencyRelationship,
+    APIEndpoint,
+    DatabaseModel,
+    DatabaseField,
+    DatabaseRelationship,
+    Diagram,
+    utc_now,
+)
 from app.parsers.code_extractor import code_parsing_engine
 from app.services.dependency_analyzer import dependency_analyzer
 from app.services.api_discovery import AutomaticAPIDiscoveryService
+from app.services.database_analyzer import database_structure_analyzer
+from app.services.knowledge_graph_service import knowledge_graph_service
 from app.schemas.project import (
     ProjectCreate,
     ProjectFileNode,
@@ -41,6 +54,14 @@ from app.schemas.project import (
     APIEndpointResponse,
     APIEndpointDetailResponse,
     APIAnalysisResponse,
+    DatabaseFieldResponse,
+    DatabaseRelationshipResponse,
+    DatabaseModelResponse,
+    DatabaseAnalysisResponse,
+    DatabaseDiagramResponse,
+    KnowledgeBuildResponse,
+    KnowledgeGraphResponse,
+    KnowledgeEntityDetailResponse,
 )
 from app.services.repository_scanner import repository_scanner
 
@@ -1037,6 +1058,294 @@ class ProjectService:
             metadata=endpoint.metadata_json or {},
             created_at=endpoint.created_at,
             related_components=related_components,
+        )
+
+    async def analyze_database(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> DatabaseAnalysisResponse:
+        await self.get_project(project_id, db)
+        project_dir = settings.PROJECTS_DIR / project_id
+
+        # 1. Run static database structure analysis (no SQL execution)
+        analysis = database_structure_analyzer.analyze_repository(str(project_dir))
+
+        # 2. Clear previous database models & relationships for this project
+        await db.execute(delete(DatabaseRelationship).where(DatabaseRelationship.project_id == project_id))
+        await db.execute(delete(DatabaseModel).where(DatabaseModel.project_id == project_id))
+        await db.flush()
+
+        # 3. Insert models & fields
+        stored_models: List[DatabaseModel] = []
+        for m_data in analysis["models"]:
+            model_id = str(uuid.uuid4())
+            db_model = DatabaseModel(
+                id=model_id,
+                project_id=project_id,
+                name=m_data["name"],
+                table_name=m_data["table_name"],
+                file_path=m_data["file_path"],
+                orm_type=m_data.get("orm_type", "SQLAlchemy"),
+                start_line=m_data.get("start_line", 1),
+                metadata_json=m_data.get("metadata", {}),
+            )
+            for f_data in m_data.get("fields", []):
+                field_id = str(uuid.uuid4())
+                db_field = DatabaseField(
+                    id=field_id,
+                    model_id=model_id,
+                    name=f_data["name"],
+                    data_type=f_data.get("data_type", "String"),
+                    is_primary_key=f_data.get("is_primary_key", False),
+                    is_foreign_key=f_data.get("is_foreign_key", False),
+                    foreign_key_target=f_data.get("foreign_key_target"),
+                    is_nullable=f_data.get("is_nullable", True),
+                    default_value=f_data.get("default_value"),
+                    metadata_json=f_data.get("metadata", {}),
+                )
+                db_model.fields.append(db_field)
+
+            db.add(db_model)
+            stored_models.append(db_model)
+
+        # 4. Insert relationships
+        stored_relationships: List[DatabaseRelationship] = []
+        for r_data in analysis["relationships"]:
+            rel_id = str(uuid.uuid4())
+            db_rel = DatabaseRelationship(
+                id=rel_id,
+                project_id=project_id,
+                source_model=r_data["source_model"],
+                target_model=r_data["target_model"],
+                relationship_type=r_data["relationship_type"],
+                foreign_key_field=r_data.get("foreign_key_field"),
+                back_populates=r_data.get("back_populates"),
+                secondary_table=r_data.get("secondary_table"),
+                description=r_data.get("description"),
+                metadata_json=r_data.get("metadata", {}),
+            )
+            db.add(db_rel)
+            stored_relationships.append(db_rel)
+
+        # 5. Generate and store Mermaid ER diagram in Diagram table
+        mermaid_code = database_structure_analyzer.generate_mermaid_er(
+            analysis["models"],
+            analysis["relationships"],
+        )
+
+        # Upsert ER diagram in diagrams table
+        diag_query = select(Diagram).where(
+            Diagram.project_id == project_id,
+            Diagram.diagram_type == "er"
+        )
+        diag_res = await db.execute(diag_query)
+        diagram_rec = diag_res.scalars().first()
+        if diagram_rec:
+            diagram_rec.mermaid_code = mermaid_code
+            diagram_rec.title = "Database Entity Relationship Diagram"
+            diagram_rec.updated_at = utc_now()
+        else:
+            new_diag = Diagram(
+                id=str(uuid.uuid4()),
+                project_id=project_id,
+                diagram_type="er",
+                title="Database Entity Relationship Diagram",
+                mermaid_code=mermaid_code,
+            )
+            db.add(new_diag)
+
+        await db.commit()
+
+        # Re-fetch models with fields
+        query_models = select(DatabaseModel).where(DatabaseModel.project_id == project_id).order_by(DatabaseModel.name.asc())
+        m_result = await db.execute(query_models)
+        final_models = list(m_result.scalars().all())
+
+        query_rels = select(DatabaseRelationship).where(DatabaseRelationship.project_id == project_id).order_by(DatabaseRelationship.source_model.asc())
+        r_result = await db.execute(query_rels)
+        final_rels = list(r_result.scalars().all())
+
+        total_fields = sum(len(m.fields) for m in final_models)
+
+        logger.info(
+            f"Database analysis for project {project_id}: found {len(final_models)} models, "
+            f"{total_fields} fields, {len(final_rels)} relationships"
+        )
+
+        return DatabaseAnalysisResponse(
+            project_id=project_id,
+            status="ANALYZED",
+            total_models=len(final_models),
+            total_fields=total_fields,
+            total_relationships=len(final_rels),
+            orm_breakdown=analysis.get("orm_breakdown", {}),
+            models=[DatabaseModelResponse.model_validate(m) for m in final_models],
+            relationships=[DatabaseRelationshipResponse.model_validate(r) for r in final_rels],
+            analyzed_at=utc_now(),
+        )
+
+    async def get_database_models(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        orm_type: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[DatabaseModel]:
+        await self.get_project(project_id, db)
+        query = select(DatabaseModel).where(DatabaseModel.project_id == project_id)
+
+        if orm_type:
+            query = query.where(DatabaseModel.orm_type.ilike(f"%{orm_type}%"))
+        if search:
+            query = query.where(
+                (DatabaseModel.name.ilike(f"%{search}%")) |
+                (DatabaseModel.table_name.ilike(f"%{search}%")) |
+                (DatabaseModel.file_path.ilike(f"%{search}%"))
+            )
+
+        query = query.order_by(DatabaseModel.name.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_database_relationships(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        model_name: Optional[str] = None,
+        relationship_type: Optional[str] = None,
+    ) -> List[DatabaseRelationship]:
+        await self.get_project(project_id, db)
+        query = select(DatabaseRelationship).where(DatabaseRelationship.project_id == project_id)
+
+        if model_name:
+            query = query.where(
+                (DatabaseRelationship.source_model == model_name) |
+                (DatabaseRelationship.target_model == model_name)
+            )
+        if relationship_type:
+            query = query.where(DatabaseRelationship.relationship_type == relationship_type.upper())
+
+        query = query.order_by(DatabaseRelationship.source_model.asc(), DatabaseRelationship.target_model.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    async def get_database_diagram(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> DatabaseDiagramResponse:
+        await self.get_project(project_id, db)
+
+        # Check existing stored models & relationships
+        query_models = select(DatabaseModel).where(DatabaseModel.project_id == project_id).order_by(DatabaseModel.name.asc())
+        m_result = await db.execute(query_models)
+        models = list(m_result.scalars().all())
+
+        query_rels = select(DatabaseRelationship).where(DatabaseRelationship.project_id == project_id).order_by(DatabaseRelationship.source_model.asc())
+        r_result = await db.execute(query_rels)
+        relationships = list(r_result.scalars().all())
+
+        if models:
+            models_dict = [
+                {
+                    "name": m.name,
+                    "table_name": m.table_name,
+                    "fields": [
+                        {
+                            "name": f.name,
+                            "data_type": f.data_type,
+                            "is_primary_key": f.is_primary_key,
+                            "is_foreign_key": f.is_foreign_key,
+                        }
+                        for f in m.fields
+                    ],
+                }
+                for m in models
+            ]
+            rels_dict = [
+                {
+                    "source_model": r.source_model,
+                    "target_model": r.target_model,
+                    "relationship_type": r.relationship_type,
+                    "description": r.description,
+                    "back_populates": r.back_populates,
+                }
+                for r in relationships
+            ]
+            mermaid_code = database_structure_analyzer.generate_mermaid_er(models_dict, rels_dict)
+            total_m = len(models)
+            total_r = len(relationships)
+        else:
+            # Fallback: check if an ER Diagram exists in diagrams table
+            diag_query = select(Diagram).where(Diagram.project_id == project_id, Diagram.diagram_type == "er")
+            diag_res = await db.execute(diag_query)
+            stored_diag = diag_res.scalars().first()
+            if stored_diag and stored_diag.mermaid_code:
+                mermaid_code = stored_diag.mermaid_code
+                total_m = len(models)
+                total_r = len(relationships)
+            else:
+                # If neither exists, generate from project files on the fly
+                project_dir = settings.PROJECTS_DIR / project_id
+                analysis = database_structure_analyzer.analyze_repository(str(project_dir))
+                mermaid_code = database_structure_analyzer.generate_mermaid_er(
+                    analysis["models"],
+                    analysis["relationships"],
+                )
+                total_m = len(analysis["models"])
+                total_r = len(analysis["relationships"])
+
+        return DatabaseDiagramResponse(
+            project_id=project_id,
+            mermaid_code=mermaid_code,
+            total_models=total_m,
+            total_relationships=total_r,
+        )
+
+    # =========================================================================
+    # PHASE 8: UNIFIED PROJECT KNOWLEDGE GRAPH
+    # =========================================================================
+
+    async def build_knowledge_graph(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> KnowledgeBuildResponse:
+        return await knowledge_graph_service.build_knowledge_graph(project_id, db)
+
+    async def get_knowledge_graph(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        node_types: Optional[List[str]] = None,
+        search: Optional[str] = None,
+        focus_id: Optional[str] = None,
+        depth: int = 2,
+        limit: int = 150,
+        offset: int = 0,
+    ) -> KnowledgeGraphResponse:
+        return await knowledge_graph_service.get_knowledge_graph(
+            project_id=project_id,
+            db=db,
+            node_types=node_types,
+            search=search,
+            focus_id=focus_id,
+            depth=depth,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def get_entity_knowledge(
+        self,
+        project_id: str,
+        entity_id: str,
+        db: AsyncSession,
+    ) -> KnowledgeEntityDetailResponse:
+        return await knowledge_graph_service.get_entity_knowledge(
+            project_id=project_id,
+            entity_id=entity_id,
+            db=db,
         )
 
 

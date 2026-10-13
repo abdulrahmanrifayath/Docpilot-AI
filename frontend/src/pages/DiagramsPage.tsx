@@ -20,10 +20,12 @@ import { useProjects } from '../context/ProjectContext';
 import { fetchDependencyGraph, analyzeDependencies } from '../api/client';
 import { DependencyGraphResponse } from '../types';
 import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
+import { DatabaseSchemaExplorer } from '../components/DatabaseSchemaExplorer';
+import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
 
 export const DiagramsPage: React.FC = () => {
   const { activeProject } = useProjects();
-  const [selectedDiagram, setSelectedDiagram] = useState<string>('dependencies');
+  const [selectedDiagram, setSelectedDiagram] = useState<string>('unified');
   const [graphData, setGraphData] = useState<DependencyGraphResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
@@ -81,9 +83,9 @@ export const DiagramsPage: React.FC = () => {
   }
 
   const diagramTypes = [
+    { id: 'unified', name: 'Unified Knowledge Graph', icon: Workflow, desc: 'Cross-tier architecture: Files → APIs → Services → Database' },
     { id: 'dependencies', name: 'Component Dependencies', icon: Layers, desc: 'Interactive React Flow entity & dependency graph' },
-    { id: 'architecture', name: 'High-Level Architecture', icon: Workflow, desc: 'Overall system layout & services' },
-    { id: 'er', name: 'Entity Relationship (ER)', icon: Database, desc: 'Data models & schema relations' },
+    { id: 'er', name: 'Database ER Diagram', icon: Database, desc: 'Data models & schema relations' },
     { id: 'sequence', name: 'Request Lifecycle', icon: GitFork, desc: 'End-to-end request sequence' },
   ];
 
@@ -93,13 +95,13 @@ export const DiagramsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">System Architecture & Dependencies</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">System Architecture & Knowledge Graph</h1>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               {activeProject.name}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Static analysis detected relations, imports, function calls, class inheritance, and dependency topology.
+            Unified multi-tier knowledge graph connecting directories, files, AST entities, APIs, services, and database models.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -142,7 +144,12 @@ export const DiagramsPage: React.FC = () => {
       </div>
 
       {/* Main Canvas Area */}
-      {selectedDiagram === 'dependencies' ? (
+      {selectedDiagram === 'unified' ? (
+        <ArchitectureExplorer
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+        />
+      ) : selectedDiagram === 'dependencies' ? (
         <div className="space-y-4">
           <DependencyGraphViewer
             graphData={graphData}
@@ -150,6 +157,12 @@ export const DiagramsPage: React.FC = () => {
             isLoading={loading || analyzing}
           />
         </div>
+      ) : selectedDiagram === 'er' ? (
+        <DatabaseSchemaExplorer
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+          defaultView="diagram"
+        />
       ) : (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 min-h-[460px] flex flex-col justify-between">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices
+from pydantic import BaseModel, Field, ConfigDict, field_validator, AliasChoices, computed_field
 
 
 class ProjectCreate(BaseModel):
@@ -229,6 +229,156 @@ class APIAnalysisResponse(BaseModel):
     framework_breakdown: Dict[str, int] = Field(default_factory=dict)
     endpoints: List[APIEndpointResponse] = Field(default_factory=list)
     analyzed_at: datetime
+
+
+class DatabaseFieldResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    name: str
+    data_type: str
+    is_primary_key: bool = False
+    is_foreign_key: bool = False
+    foreign_key_target: Optional[str] = None
+    is_nullable: bool = True
+    default_value: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+
+class DatabaseRelationshipResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    source_model: str
+    target_model: str
+    relationship_type: str  # ONE_TO_ONE, ONE_TO_MANY, MANY_TO_MANY, FOREIGN_KEY
+    foreign_key_field: Optional[str] = None
+    back_populates: Optional[str] = None
+    secondary_table: Optional[str] = None
+    description: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+
+class DatabaseModelResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    name: str
+    table_name: str
+    file_path: str
+    orm_type: str = "SQLAlchemy"
+    start_line: int = 1
+    fields: List[DatabaseFieldResponse] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+
+
+class DatabaseAnalysisResponse(BaseModel):
+    project_id: str
+    status: str
+    total_models: int
+    total_fields: int
+    total_relationships: int
+    orm_breakdown: Dict[str, int] = Field(default_factory=dict)
+    models: List[DatabaseModelResponse] = Field(default_factory=list)
+    relationships: List[DatabaseRelationshipResponse] = Field(default_factory=list)
+    analyzed_at: datetime
+
+
+class DatabaseDiagramResponse(BaseModel):
+    project_id: str
+    mermaid_code: str
+    total_models: int
+    total_relationships: int
+
+
+# =============================================================================
+# PHASE 8: UNIFIED PROJECT KNOWLEDGE GRAPH SCHEMAS
+# =============================================================================
+
+class KnowledgeNodeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    name: str
+    label: str
+    node_type: str  # folder, file, module, class, function, api, database, service, external
+    file_path: Optional[str] = None
+    entity_id: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+
+
+class KnowledgeEdgeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    source: str = Field(validation_alias=AliasChoices("source_id", "source"))
+    target: str = Field(validation_alias=AliasChoices("target_id", "target"))
+    source_name: str
+    target_name: str
+    source_type: str
+    target_type: str
+    relationship_type: str
+    confidence: float = 1.0
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+
+    @computed_field
+    @property
+    def source_id(self) -> str:
+        return self.source
+
+    @computed_field
+    @property
+    def target_id(self) -> str:
+        return self.target
+
+
+
+class KnowledgeGraphStats(BaseModel):
+    total_nodes: int
+    total_edges: int
+    node_types: Dict[str, int] = Field(default_factory=dict)
+    relationship_types: Dict[str, int] = Field(default_factory=dict)
+
+
+class KnowledgeGraphResponse(BaseModel):
+    project_id: str
+    nodes: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    edges: List[KnowledgeEdgeResponse] = Field(default_factory=list)
+    stats: KnowledgeGraphStats
+    limit: int = 150
+    offset: int = 0
+    has_more: bool = False
+    focus_id: Optional[str] = None
+    depth: Optional[int] = None
+
+
+class KnowledgeBuildResponse(BaseModel):
+    project_id: str
+    status: str
+    total_nodes: int
+    total_edges: int
+    node_types: Dict[str, int] = Field(default_factory=dict)
+    relationship_types: Dict[str, int] = Field(default_factory=dict)
+    built_at: datetime
+
+
+class KnowledgeEntityDetailResponse(BaseModel):
+    entity: KnowledgeNodeResponse
+    incoming_edges: List[KnowledgeEdgeResponse] = Field(default_factory=list)
+    outgoing_edges: List[KnowledgeEdgeResponse] = Field(default_factory=list)
+    connected_apis: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    connected_database_models: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    dependencies: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    dependents: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    neighborhood_nodes: List[KnowledgeNodeResponse] = Field(default_factory=list)
+    neighborhood_edges: List[KnowledgeEdgeResponse] = Field(default_factory=list)
+
 
 
 

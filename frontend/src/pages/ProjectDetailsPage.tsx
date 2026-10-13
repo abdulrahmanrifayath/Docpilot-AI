@@ -37,6 +37,7 @@ import {
   Sparkles,
   Workflow,
   Network,
+  Database,
 } from 'lucide-react';
 import {
   Project,
@@ -63,12 +64,18 @@ import {
   analyzeDependencies,
   fetchProjectApis,
   analyzeProjectApis,
+  fetchDatabaseModels,
+  analyzeProjectDatabase,
+  buildKnowledgeGraph,
+  fetchKnowledgeGraph,
   uploadProjectZip,
   cloneProjectGit,
   deleteProject,
 } from '../api/client';
 import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
 import { APIExplorer } from '../components/APIExplorer';
+import { DatabaseSchemaExplorer } from '../components/DatabaseSchemaExplorer';
+import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -251,6 +258,12 @@ export const ProjectDetailsPage: React.FC = () => {
   const [apis, setApis] = useState<APIEndpoint[]>([]);
   const [analyzingApis, setAnalyzingApis] = useState<boolean>(false);
   const [analyzeApisSuccess, setAnalyzeApisSuccess] = useState<boolean>(false);
+  const [dbModelsCount, setDbModelsCount] = useState<number>(0);
+  const [analyzingDb, setAnalyzingDb] = useState<boolean>(false);
+  const [analyzeDbSuccess, setAnalyzeDbSuccess] = useState<boolean>(false);
+  const [knowledgeStats, setKnowledgeStats] = useState<{ nodes: number; edges: number } | null>(null);
+  const [buildingKnowledge, setBuildingKnowledge] = useState<boolean>(false);
+  const [buildKnowledgeSuccess, setBuildKnowledgeSuccess] = useState<boolean>(false);
   const [fileEntities, setFileEntities] = useState<CodeEntity[]>([]);
   const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
   const [entityFilter, setEntityFilter] = useState<string>('ALL');
@@ -271,7 +284,7 @@ export const ProjectDetailsPage: React.FC = () => {
   const loadAllData = async (projId: string) => {
     try {
       setLoading(true);
-      const [proj, struct, tech, stats, allEntities, graph, discoveredApis] = await Promise.all([
+      const [proj, struct, tech, stats, allEntities, graph, discoveredApis, dbModels, kGraph] = await Promise.all([
         fetchProject(projId),
         fetchProjectStructure(projId).catch(() => null),
         fetchProjectTechnologies(projId).catch(() => null),
@@ -279,6 +292,8 @@ export const ProjectDetailsPage: React.FC = () => {
         fetchProjectEntities(projId).catch(() => []),
         fetchDependencyGraph(projId).catch(() => null),
         fetchProjectApis(projId).catch(() => []),
+        fetchDatabaseModels(projId).catch(() => []),
+        fetchKnowledgeGraph(projId, { limit: 1 }).catch(() => null),
       ]);
 
       setProject(proj);
@@ -289,6 +304,13 @@ export const ProjectDetailsPage: React.FC = () => {
       setTotalEntitiesCount(allEntities.length);
       setDepGraphData(graph);
       setApis(discoveredApis || []);
+      setDbModelsCount(dbModels?.length || 0);
+      if (kGraph?.stats) {
+        setKnowledgeStats({
+          nodes: kGraph.stats.total_nodes,
+          edges: kGraph.stats.total_edges,
+        });
+      }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load project details');
     } finally {
@@ -390,6 +412,43 @@ export const ProjectDetailsPage: React.FC = () => {
       setAnalyzingApis(false);
     }
   };
+
+  const handleAnalyzeDatabase = async () => {
+    if (!project) return;
+    setAnalyzingDb(true);
+    setAnalyzeDbSuccess(false);
+    try {
+      const res = await analyzeProjectDatabase(project.id);
+      setDbModelsCount(res.total_models || 0);
+      setAnalyzeDbSuccess(true);
+      await loadAllData(project.id);
+      await refreshProjects();
+      setTimeout(() => setAnalyzeDbSuccess(false), 4000);
+    } catch (err: any) {
+      alert(`Database Analysis failed: ${err.message || err}`);
+    } finally {
+      setAnalyzingDb(false);
+    }
+  };
+
+  const handleBuildKnowledge = async () => {
+    if (!project) return;
+    setBuildingKnowledge(true);
+    setBuildKnowledgeSuccess(false);
+    try {
+      const res = await buildKnowledgeGraph(project.id);
+      setKnowledgeStats({ nodes: res.total_nodes, edges: res.total_edges });
+      setBuildKnowledgeSuccess(true);
+      await loadAllData(project.id);
+      await refreshProjects();
+      setTimeout(() => setBuildKnowledgeSuccess(false), 4000);
+    } catch (err: any) {
+      alert(`Knowledge Graph build failed: ${err.message || err}`);
+    } finally {
+      setBuildingKnowledge(false);
+    }
+  };
+
 
   const handleDelete = async () => {
 
@@ -594,6 +653,48 @@ export const ProjectDetailsPage: React.FC = () => {
             <span>{analyzingApis ? 'Scanning Routes...' : analyzeApisSuccess ? 'APIs Discovered' : 'Discover APIs'}</span>
           </button>
 
+          {/* Analyze Database Button */}
+          <button
+            onClick={handleAnalyzeDatabase}
+            disabled={analyzingDb || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              analyzeDbSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/25'
+            } disabled:opacity-50`}
+            title="Automatically inspect database models, relationships, and generate Mermaid ER diagrams"
+          >
+            {analyzingDb ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : analyzeDbSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Database className="w-3.5 h-3.5" />
+            )}
+            <span>{analyzingDb ? 'Analyzing DB...' : analyzeDbSuccess ? 'Database Analyzed' : 'Analyze Database'}</span>
+          </button>
+
+          {/* Build Knowledge Graph Button */}
+          <button
+            onClick={handleBuildKnowledge}
+            disabled={buildingKnowledge || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              buildKnowledgeSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-brand-600/25'
+            } disabled:opacity-50`}
+            title="Combine scanner, AST entities, dependencies, APIs, and database models into a unified project knowledge graph"
+          >
+            {buildingKnowledge ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : buildKnowledgeSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            <span>{buildingKnowledge ? 'Building Graph...' : buildKnowledgeSuccess ? 'Knowledge Graph Built' : 'Build Knowledge Graph'}</span>
+          </button>
+
           <button
             onClick={() => id && loadAllData(id)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
@@ -649,7 +750,7 @@ export const ProjectDetailsPage: React.FC = () => {
           <Activity className="w-3.5 h-3.5 text-brand-400" />
           <span>Project Overview & Discovery Metrics</span>
         </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Files</span>
             <p className="text-2xl font-extrabold text-white mt-1">{totalFiles.toLocaleString()}</p>
@@ -701,13 +802,25 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Last Analysis</span>
-            <p className="text-xs font-semibold text-white mt-2 truncate">
-              {project.last_analyzed_at
-                ? new Date(project.last_analyzed_at).toLocaleString()
-                : 'Scanned upon ingestion'}
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+              Database Models
+            </span>
+            <p className="text-2xl font-extrabold text-amber-300 mt-1">{dbModelsCount.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">
+              SQLAlchemy & Django models
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-brand-950/40 to-slate-900/60 border border-brand-500/30">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-300">
+              Knowledge Graph
+            </span>
+            <p className="text-2xl font-extrabold text-white mt-1">
+              {(knowledgeStats?.nodes || 0).toLocaleString()}
             </p>
-            <span className="text-[10px] text-slate-500 block mt-1">Static AST discovery</span>
+            <span className="text-[10px] text-brand-300/80 block mt-1">
+              {knowledgeStats?.edges || 0} cross-tier edges
+            </span>
           </div>
         </div>
       </div>
@@ -1221,7 +1334,68 @@ export const ProjectDetailsPage: React.FC = () => {
           onRefreshProject={() => loadAllData(project.id)}
         />
       </div>
+
+      {/* SECTION 6: DATABASE STRUCTURE ANALYSIS & ER ARCHITECTURE (PHASE 7) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Database className="w-4 h-4 text-amber-400" />
+              <span>Database Structure & Entity-Relationship Schema</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Static ORM inspection (SQLAlchemy, Django ORM, SQL files) with Mermaid ER diagrams, columns, types, and relationship cardinalities.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/diagrams"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all border border-slate-700"
+            >
+              <span>Full ER Canvas</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        <DatabaseSchemaExplorer
+          projectId={project.id}
+          projectName={project.name}
+          onRefreshProject={() => loadAllData(project.id)}
+          defaultView="diagram"
+        />
+      </div>
+
+      {/* SECTION 7: UNIFIED PROJECT KNOWLEDGE GRAPH (PHASE 8) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Network className="w-4 h-4 text-brand-400" />
+              <span>Unified Project Architecture & Knowledge Graph</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Cross-tier project knowledge model connecting Folders → Files → Modules → Classes → Functions → APIs → Database Models.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/diagrams"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all border border-slate-700"
+            >
+              <span>Dedicated Diagram Canvas</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        <ArchitectureExplorer
+          projectId={project.id}
+          projectName={project.name}
+        />
+      </div>
     </div>
   );
 };
+
 
