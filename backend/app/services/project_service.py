@@ -20,9 +20,10 @@ from app.core.exceptions import (
     GitCloneException,
 )
 from app.core.logging import logger
-from app.models.project import Project, CodeEntity, DependencyNode, DependencyRelationship, utc_now
+from app.models.project import Project, CodeEntity, DependencyNode, DependencyRelationship, APIEndpoint, utc_now
 from app.parsers.code_extractor import code_parsing_engine
 from app.services.dependency_analyzer import dependency_analyzer
+from app.services.api_discovery import AutomaticAPIDiscoveryService
 from app.schemas.project import (
     ProjectCreate,
     ProjectFileNode,
@@ -37,6 +38,9 @@ from app.schemas.project import (
     DependencyGraphResponse,
     DependencyAnalysisResponse,
     EntityDependenciesResponse,
+    APIEndpointResponse,
+    APIEndpointDetailResponse,
+    APIAnalysisResponse,
 )
 from app.services.repository_scanner import repository_scanner
 
@@ -842,6 +846,197 @@ class ProjectService:
             incoming=[DependencyRelationshipResponse.model_validate(e) for e in incoming_edges],
             outgoing=[DependencyRelationshipResponse.model_validate(e) for e in outgoing_edges],
             neighbors=[DependencyNodeResponse.model_validate(n) for n in neighbors],
+        )
+
+    # =========================================================================
+    # PHASE 6: AUTOMATIC API DISCOVERY
+    # =========================================================================
+
+    async def analyze_apis(self, project_id: str, db: AsyncSession) -> APIAnalysisResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if not base_path or not base_path.exists() or not base_path.is_dir():
+            raise ValidationException(
+                message="Project repository directory does not exist or has not been uploaded yet.",
+                details={"repository_path": project.repository_path if project else None},
+            )
+
+        discoverer = AutomaticAPIDiscoveryService()
+        discovered_eps = discoverer.discover_apis(str(base_path))
+
+        # Clear existing api_endpoints for this project
+        await db.execute(delete(APIEndpoint).where(APIEndpoint.project_id == project_id))
+
+        method_breakdown: Dict[str, int] = {}
+        framework_breakdown: Dict[str, int] = {}
+        auth_count = 0
+        public_count = 0
+
+        created_endpoints: List[APIEndpoint] = []
+        for ep in discovered_eps:
+            ep_id = str(uuid.uuid4())
+            method = ep["method"].upper()
+            method_breakdown[method] = method_breakdown.get(method, 0) + 1
+
+            fw = ep.get("metadata", {}).get("framework", "FastAPI")
+            framework_breakdown[fw] = framework_breakdown.get(fw, 0) + 1
+
+            is_auth = bool(ep.get("authentication_required", False))
+            if is_auth:
+                auth_count += 1
+            else:
+                public_count += 1
+
+            endpoint_obj = APIEndpoint(
+                id=ep_id,
+                project_id=project_id,
+                method=method,
+                path=ep["path"],
+                handler_name=ep["handler_name"],
+                file_path=ep["file_path"],
+                request_schema=ep.get("request_schema", {}),
+                response_schema=ep.get("response_schema", {}),
+                authentication_required=is_auth,
+                tags=ep.get("tags", []),
+                metadata_json=ep.get("metadata", {}),
+            )
+            db.add(endpoint_obj)
+            created_endpoints.append(endpoint_obj)
+
+        project.last_analyzed_at = utc_now()
+        await db.commit()
+
+        logger.info(
+            f"API Discovery for project {project_id}: found {len(created_endpoints)} endpoints "
+            f"({auth_count} authenticated, {public_count} public)"
+        )
+
+        return APIAnalysisResponse(
+            project_id=project_id,
+            status="ANALYZED",
+            total_endpoints=len(created_endpoints),
+            authenticated_endpoints=auth_count,
+            public_endpoints=public_count,
+            method_breakdown=method_breakdown,
+            framework_breakdown=framework_breakdown,
+            endpoints=[APIEndpointResponse.model_validate(ep) for ep in created_endpoints],
+            analyzed_at=utc_now(),
+        )
+
+    async def get_apis(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        method: Optional[str] = None,
+        tag: Optional[str] = None,
+        auth_required: Optional[bool] = None,
+        search: Optional[str] = None,
+    ) -> List[APIEndpoint]:
+        await self.get_project(project_id, db)
+        query = select(APIEndpoint).where(APIEndpoint.project_id == project_id)
+
+        if method:
+            query = query.where(APIEndpoint.method == method.upper())
+        if auth_required is not None:
+            query = query.where(APIEndpoint.authentication_required == auth_required)
+        if search:
+            query = query.where(
+                (APIEndpoint.path.ilike(f"%{search}%")) |
+                (APIEndpoint.handler_name.ilike(f"%{search}%")) |
+                (APIEndpoint.file_path.ilike(f"%{search}%"))
+            )
+
+        query = query.order_by(APIEndpoint.path.asc(), APIEndpoint.method.asc())
+        result = await db.execute(query)
+        endpoints = list(result.scalars().all())
+
+        if tag:
+            tag_lower = tag.lower()
+            endpoints = [
+                ep for ep in endpoints
+                if any(t.lower() == tag_lower for t in (ep.tags or []))
+            ]
+
+        return endpoints
+
+    async def get_api_endpoint(
+        self,
+        project_id: str,
+        api_id: str,
+        db: AsyncSession,
+    ) -> APIEndpointDetailResponse:
+        await self.get_project(project_id, db)
+
+        # Look up by id or handler_name
+        query = select(APIEndpoint).where(
+            APIEndpoint.project_id == project_id,
+            (APIEndpoint.id == api_id) | (APIEndpoint.handler_name == api_id)
+        )
+        res = await db.execute(query)
+        endpoint = res.scalars().first()
+        if not endpoint:
+            raise EntityNotFoundException("APIEndpoint", api_id)
+
+        # Cross-reference related components (services, models, entities)
+        related_components: List[Dict[str, Any]] = []
+        meta = endpoint.metadata_json or {}
+        raw_components = meta.get("related_components", [])
+
+        # Check CodeEntity and DependencyNode matches
+        candidate_names = set(raw_components)
+        candidate_names.add(endpoint.handler_name)
+        if endpoint.request_schema and endpoint.request_schema.get("body_model"):
+            candidate_names.add(endpoint.request_schema["body_model"])
+        if endpoint.response_schema and endpoint.response_schema.get("model"):
+            candidate_names.add(endpoint.response_schema["model"])
+
+        if candidate_names:
+            node_res = await db.execute(
+                select(DependencyNode).where(
+                    DependencyNode.project_id == project_id,
+                    DependencyNode.name.in_(candidate_names)
+                )
+            )
+            for node in node_res.scalars().all():
+                related_components.append({
+                    "id": node.id,
+                    "name": node.name,
+                    "type": node.node_type,
+                    "file_path": node.file_path,
+                    "is_external": node.is_external,
+                })
+
+            entity_res = await db.execute(
+                select(CodeEntity).where(
+                    CodeEntity.project_id == project_id,
+                    CodeEntity.name.in_(candidate_names)
+                )
+            )
+            seen_names = {rc["name"] for rc in related_components}
+            for ent in entity_res.scalars().all():
+                if ent.name not in seen_names:
+                    related_components.append({
+                        "id": ent.id,
+                        "name": ent.name,
+                        "type": ent.entity_type.lower(),
+                        "file_path": ent.file_path,
+                        "is_external": False,
+                    })
+
+        return APIEndpointDetailResponse(
+            id=endpoint.id,
+            project_id=endpoint.project_id,
+            method=endpoint.method,
+            path=endpoint.path,
+            handler_name=endpoint.handler_name,
+            file_path=endpoint.file_path,
+            request_schema=endpoint.request_schema or {},
+            response_schema=endpoint.response_schema or {},
+            authentication_required=endpoint.authentication_required,
+            tags=endpoint.tags or [],
+            metadata=endpoint.metadata_json or {},
+            created_at=endpoint.created_at,
+            related_components=related_components,
         )
 
 

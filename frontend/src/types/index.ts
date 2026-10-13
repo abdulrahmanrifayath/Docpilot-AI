@@ -174,8 +174,66 @@ export interface EntityDependenciesResponse {
   neighbors: DependencyNode[];
 }
 
+export interface APIEndpoint {
+  id: string;
+  project_id: string;
+  method: string;
+  path: string;
+  handler_name: string;
+  file_path: string;
+  request_schema: {
+    body_model?: string | null;
+    body_type?: string | null;
+    parameters?: Array<{
+      name: string;
+      type: string;
+      in: 'path' | 'query' | 'body' | 'header';
+      required: boolean;
+      default?: any;
+    }>;
+  };
+  response_schema: {
+    model?: string;
+    status_code?: number;
+    return_type?: string | null;
+  };
+  authentication_required: boolean;
+  tags: string[];
+  metadata: {
+    start_line?: number;
+    end_line?: number;
+    framework?: string;
+    docstring?: string | null;
+    purpose?: string;
+    dependencies?: string[];
+    middlewares?: string[];
+    router_variable?: string | null;
+    related_components?: Array<string | { id?: string; name: string; type?: string; file_path?: string }>;
+  };
+  created_at?: string;
+}
 
+export interface APIEndpointDetail extends APIEndpoint {
+  related_components: Array<{
+    id: string;
+    name: string;
+    type: string;
+    file_path?: string;
+    is_external?: boolean;
+  }>;
+}
 
+export interface APIAnalysisResponse {
+  project_id: string;
+  status: string;
+  total_endpoints: number;
+  authenticated_endpoints: number;
+  public_endpoints: number;
+  method_breakdown: Record<string, number>;
+  framework_breakdown: Record<string, number>;
+  endpoints: APIEndpoint[];
+  analyzed_at: string;
+}
 
 export interface ProjectCreatePayload {
   name: string;

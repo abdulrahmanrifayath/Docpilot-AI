@@ -7,6 +7,7 @@ from app.models.project import (
     CodeEntity,
     DependencyNode,
     DependencyRelationship,
+    APIEndpoint,
 )
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "CodeEntity",
     "DependencyNode",
     "DependencyRelationship",
+    "APIEndpoint",
 ]
 

@@ -48,6 +48,7 @@ import {
   CodeEntityType,
   ProjectParseResponse,
   DependencyGraphResponse,
+  APIEndpoint,
 } from '../types';
 import {
   fetchProject,
@@ -60,11 +61,14 @@ import {
   fetchProjectEntities,
   fetchDependencyGraph,
   analyzeDependencies,
+  fetchProjectApis,
+  analyzeProjectApis,
   uploadProjectZip,
   cloneProjectGit,
   deleteProject,
 } from '../api/client';
 import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
+import { APIExplorer } from '../components/APIExplorer';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -244,6 +248,9 @@ export const ProjectDetailsPage: React.FC = () => {
   const [depGraphData, setDepGraphData] = useState<DependencyGraphResponse | null>(null);
   const [analyzingDeps, setAnalyzingDeps] = useState<boolean>(false);
   const [analyzeDepsSuccess, setAnalyzeDepsSuccess] = useState<boolean>(false);
+  const [apis, setApis] = useState<APIEndpoint[]>([]);
+  const [analyzingApis, setAnalyzingApis] = useState<boolean>(false);
+  const [analyzeApisSuccess, setAnalyzeApisSuccess] = useState<boolean>(false);
   const [fileEntities, setFileEntities] = useState<CodeEntity[]>([]);
   const [loadingEntities, setLoadingEntities] = useState<boolean>(false);
   const [entityFilter, setEntityFilter] = useState<string>('ALL');
@@ -264,13 +271,14 @@ export const ProjectDetailsPage: React.FC = () => {
   const loadAllData = async (projId: string) => {
     try {
       setLoading(true);
-      const [proj, struct, tech, stats, allEntities, graph] = await Promise.all([
+      const [proj, struct, tech, stats, allEntities, graph, discoveredApis] = await Promise.all([
         fetchProject(projId),
         fetchProjectStructure(projId).catch(() => null),
         fetchProjectTechnologies(projId).catch(() => null),
         fetchProjectStatistics(projId).catch(() => null),
         fetchProjectEntities(projId).catch(() => []),
         fetchDependencyGraph(projId).catch(() => null),
+        fetchProjectApis(projId).catch(() => []),
       ]);
 
       setProject(proj);
@@ -280,6 +288,7 @@ export const ProjectDetailsPage: React.FC = () => {
       setStatsData(stats);
       setTotalEntitiesCount(allEntities.length);
       setDepGraphData(graph);
+      setApis(discoveredApis || []);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load project details');
     } finally {
@@ -361,6 +370,24 @@ export const ProjectDetailsPage: React.FC = () => {
       alert(`Dependency analysis failed: ${err.message || err}`);
     } finally {
       setAnalyzingDeps(false);
+    }
+  };
+
+  const handleAnalyzeApis = async () => {
+    if (!project) return;
+    setAnalyzingApis(true);
+    setAnalyzeApisSuccess(false);
+    try {
+      const res = await analyzeProjectApis(project.id);
+      setApis(res.endpoints || []);
+      setAnalyzeApisSuccess(true);
+      await loadAllData(project.id);
+      await refreshProjects();
+      setTimeout(() => setAnalyzeApisSuccess(false), 4000);
+    } catch (err: any) {
+      alert(`API Analysis failed: ${err.message || err}`);
+    } finally {
+      setAnalyzingApis(false);
     }
   };
 
@@ -546,6 +573,27 @@ export const ProjectDetailsPage: React.FC = () => {
             <span>{analyzingDeps ? 'Analyzing Graph...' : analyzeDepsSuccess ? 'Graph Analyzed' : 'Analyze Dependencies'}</span>
           </button>
 
+          {/* Discover APIs Button */}
+          <button
+            onClick={handleAnalyzeApis}
+            disabled={analyzingApis || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              analyzeApisSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-600/25'
+            } disabled:opacity-50`}
+            title="Automatically detect backend API routes (FastAPI, Flask, Express)"
+          >
+            {analyzingApis ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : analyzeApisSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Server className="w-3.5 h-3.5" />
+            )}
+            <span>{analyzingApis ? 'Scanning Routes...' : analyzeApisSuccess ? 'APIs Discovered' : 'Discover APIs'}</span>
+          </button>
+
           <button
             onClick={() => id && loadAllData(id)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
@@ -639,6 +687,16 @@ export const ProjectDetailsPage: React.FC = () => {
             </p>
             <span className="text-[10px] text-slate-500 block mt-1">
               {depGraphData?.nodes?.length || 0} nodes · Edges detected
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-violet-400">
+              Discovered APIs
+            </span>
+            <p className="text-2xl font-extrabold text-violet-300 mt-1">{apis.length.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">
+              {apis.filter(a => a.authentication_required).length} auth · {apis.filter(a => !a.authentication_required).length} public
             </span>
           </div>
 
@@ -1131,6 +1189,36 @@ export const ProjectDetailsPage: React.FC = () => {
           graphData={depGraphData}
           onRefresh={() => id && loadAllData(id)}
           isLoading={analyzingDeps}
+        />
+      </div>
+
+      {/* SECTION 5: AUTOMATIC API DISCOVERY & SPECIFICATIONS (PHASE 6) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Server className="w-4 h-4 text-violet-400" />
+              <span>Backend API Explorer & Specifications</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Discovered backend API routes with request/response schemas, parameters, auth requirements, and component links.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/documentation"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all border border-slate-700"
+            >
+              <span>API Reference Hub</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        <APIExplorer
+          projectId={project.id}
+          projectName={project.name}
+          onRefreshProject={() => loadAllData(project.id)}
         />
       </div>
     </div>

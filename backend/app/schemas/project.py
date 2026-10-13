@@ -198,4 +198,38 @@ class EntityDependenciesResponse(BaseModel):
     neighbors: List[DependencyNodeResponse] = Field(default_factory=list)
 
 
+class APIEndpointResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    method: str
+    path: str
+    handler_name: str
+    file_path: str
+    request_schema: Dict[str, Any] = Field(default_factory=dict)
+    response_schema: Dict[str, Any] = Field(default_factory=dict)
+    authentication_required: bool = False
+    tags: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+
+
+class APIEndpointDetailResponse(APIEndpointResponse):
+    related_components: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class APIAnalysisResponse(BaseModel):
+    project_id: str
+    status: str
+    total_endpoints: int
+    authenticated_endpoints: int
+    public_endpoints: int
+    method_breakdown: Dict[str, int] = Field(default_factory=dict)
+    framework_breakdown: Dict[str, int] = Field(default_factory=dict)
+    endpoints: List[APIEndpointResponse] = Field(default_factory=list)
+    analyzed_at: datetime
+
+
+
 

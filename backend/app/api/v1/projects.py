@@ -19,6 +19,9 @@ from app.schemas.project import (
     DependencyGraphResponse,
     DependencyAnalysisResponse,
     EntityDependenciesResponse,
+    APIEndpointResponse,
+    APIEndpointDetailResponse,
+    APIAnalysisResponse,
 )
 from app.services.project_service import project_service
 
@@ -264,6 +267,57 @@ async def get_entity_dependencies(
         db=db,
     )
     return result
+
+
+# =============================================================================
+# PHASE 6: AUTOMATIC API DISCOVERY
+# =============================================================================
+
+@router.post("/{project_id}/apis/analyze", response_model=APIAnalysisResponse)
+async def analyze_project_apis(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> APIAnalysisResponse:
+    """Detect backend API endpoints from supported frameworks (FastAPI, Flask, Express)."""
+    result = await project_service.analyze_apis(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/apis", response_model=List[APIEndpointResponse])
+async def list_project_apis(
+    project_id: str,
+    method: Optional[str] = Query(None, description="Filter by HTTP method (GET, POST, PUT, DELETE, PATCH)"),
+    tag: Optional[str] = Query(None, description="Filter by API tag or route group"),
+    auth_required: Optional[bool] = Query(None, description="Filter by authentication requirement"),
+    search: Optional[str] = Query(None, description="Search path, handler name, or file path"),
+    db: AsyncSession = Depends(get_db),
+) -> List[APIEndpointResponse]:
+    """Retrieve list of discovered API endpoints with request/response schemas and auth indicators."""
+    endpoints = await project_service.get_apis(
+        project_id=project_id,
+        db=db,
+        method=method,
+        tag=tag,
+        auth_required=auth_required,
+        search=search,
+    )
+    return endpoints
+
+
+@router.get("/{project_id}/apis/{api_id}", response_model=APIEndpointDetailResponse)
+async def get_project_api_endpoint(
+    project_id: str,
+    api_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> APIEndpointDetailResponse:
+    """Retrieve detailed API endpoint specification including parameters, schemas, and related components."""
+    endpoint = await project_service.get_api_endpoint(
+        project_id=project_id,
+        api_id=api_id,
+        db=db,
+    )
+    return endpoint
+
 
 
 

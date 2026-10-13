@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
+import { APIExplorer } from '../components/APIExplorer';
 
 export const DocumentationPage: React.FC = () => {
   const { activeProject, projects } = useProjects();
@@ -170,17 +171,17 @@ export const DocumentationPage: React.FC = () => {
 
           {activeTab === 'api' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold text-white border-b border-slate-800 pb-3">
-                API Endpoint Specifications
-              </h2>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Discovers REST, GraphQL, and gRPC endpoints automatically from source annotations and routing decorators.
-              </p>
-              <div className="p-8 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                <Code2 className="w-10 h-10 text-brand-400 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-white">Endpoint Extraction Active in Phase 3</p>
-                <p className="text-[11px] text-slate-500 mt-1">Routes, parameters, models, and example payloads will be cataloged.</p>
+              <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    API Explorer & Route Discovery
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Statically discovered backend routes, parameters, schemas, and authentication requirements
+                  </p>
+                </div>
               </div>
+              <APIExplorer projectId={activeProject.id} projectName={activeProject.name} />
             </div>
           )}
 

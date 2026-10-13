@@ -13,6 +13,9 @@ import {
   DependencyGraphResponse,
   DependencyAnalysisResponse,
   EntityDependenciesResponse,
+  APIEndpoint,
+  APIEndpointDetail,
+  APIAnalysisResponse,
   SystemStatus,
   DocumentItem,
   DiagramItem,
@@ -216,6 +219,44 @@ export async function fetchEntityDependencies(
   const encoded = encodeURIComponent(entityId);
   const res = await fetch(`${API_V1}/projects/${id}/dependencies/entity/${encoded}`);
   if (!res.ok) throw new Error('Failed to fetch entity dependencies');
+  return res.json();
+}
+
+// Phase 6: Automatic API Discovery
+export async function analyzeProjectApis(id: string): Promise<APIAnalysisResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/apis/analyze`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'API discovery analysis failed' } }));
+    throw new Error(err.error?.message || 'API discovery analysis failed');
+  }
+  return res.json();
+}
+
+export async function fetchProjectApis(
+  id: string,
+  options?: { method?: string; tag?: string; auth_required?: boolean; search?: string }
+): Promise<APIEndpoint[]> {
+  const params = new URLSearchParams();
+  if (options?.method) params.append('method', options.method);
+  if (options?.tag) params.append('tag', options.tag);
+  if (options?.auth_required !== undefined) params.append('auth_required', String(options.auth_required));
+  if (options?.search) params.append('search', options.search);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const res = await fetch(`${API_V1}/projects/${id}/apis${query}`);
+  if (!res.ok) throw new Error('Failed to fetch project APIs');
+  return res.json();
+}
+
+export async function fetchProjectApiDetail(
+  id: string,
+  apiId: string
+): Promise<APIEndpointDetail> {
+  const encoded = encodeURIComponent(apiId);
+  const res = await fetch(`${API_V1}/projects/${id}/apis/${encoded}`);
+  if (!res.ok) throw new Error('Failed to fetch API endpoint details');
   return res.json();
 }
 

@@ -56,6 +56,7 @@ class Project(Base):
     code_entities = relationship("CodeEntity", back_populates="project", cascade="all, delete-orphan")
     dependency_nodes = relationship("DependencyNode", back_populates="project", cascade="all, delete-orphan")
     dependency_relationships = relationship("DependencyRelationship", back_populates="project", cascade="all, delete-orphan")
+    api_endpoints = relationship("APIEndpoint", back_populates="project", cascade="all, delete-orphan")
 
 
 class CodeEntity(Base):
@@ -112,6 +113,26 @@ class DependencyRelationship(Base):
 
     project = relationship("Project", back_populates="dependency_relationships")
 
+
+class APIEndpoint(Base):
+    __tablename__ = "api_endpoints"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    method = Column(String(20), nullable=False, index=True)  # GET, POST, PUT, DELETE, PATCH, etc.
+    path = Column(String(500), nullable=False, index=True)
+    handler_name = Column(String(255), nullable=False, index=True)
+    file_path = Column(String(500), nullable=False, index=True)
+    request_schema = Column(JSON, default=dict)
+    response_schema = Column(JSON, default=dict)
+    authentication_required = Column(Boolean, default=False, nullable=False, index=True)
+    tags = Column(JSON, default=list)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    project = relationship("Project", back_populates="api_endpoints")
 
 
 class Document(Base):
