@@ -41,6 +41,15 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if "sqlite" in settings.DATABASE_URL:
+            try:
+                res = await conn.execute(text("PRAGMA table_info(projects)"))
+                existing_cols = {row[1] for row in res.fetchall()}
+                if "infrastructure" not in existing_cols and "id" in existing_cols:
+                    await conn.execute(text("ALTER TABLE projects ADD COLUMN infrastructure JSON DEFAULT '[]'"))
+            except Exception:
+                pass
+
 
 
 async def check_db_health() -> Dict[str, Any]:

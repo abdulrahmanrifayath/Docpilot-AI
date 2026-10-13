@@ -8,10 +8,15 @@ from app.schemas.project import (
     ProjectCloneRequest,
     ProjectResponse,
     ProjectFilesResponse,
+    ProjectStructureResponse,
+    ProjectTechnologiesResponse,
+    ProjectStatisticsResponse,
+    ProjectScanResponse,
 )
 from app.services.project_service import project_service
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
+
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -93,3 +98,44 @@ async def list_project_files(
     """List file hierarchy and sizes within the project repository path."""
     files_resp = await project_service.list_project_files(project_id, db)
     return files_resp
+
+
+@router.post("/{project_id}/scan", response_model=ProjectScanResponse)
+async def scan_project(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ProjectScanResponse:
+    """Trigger static file discovery, language analysis, and technology detection without an LLM."""
+    result = await project_service.scan_project(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/structure", response_model=ProjectStructureResponse)
+async def get_project_structure(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ProjectStructureResponse:
+    """Retrieve hierarchical repository tree structure with file categories and estimated line counts."""
+    result = await project_service.get_project_structure(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/technologies", response_model=ProjectTechnologiesResponse)
+async def get_project_technologies(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ProjectTechnologiesResponse:
+    """Retrieve detected programming languages, frameworks, and infrastructure components."""
+    result = await project_service.get_project_technologies(project_id, db)
+    return result
+
+
+@router.get("/{project_id}/statistics", response_model=ProjectStatisticsResponse)
+async def get_project_statistics(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ProjectStatisticsResponse:
+    """Retrieve project-level metrics including file counts, lines of code, and language distribution."""
+    result = await project_service.get_project_statistics(project_id, db)
+    return result
+

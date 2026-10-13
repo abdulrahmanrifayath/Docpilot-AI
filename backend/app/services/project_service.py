@@ -18,8 +18,18 @@ from app.core.exceptions import (
     GitCloneException,
 )
 from app.core.logging import logger
-from app.models.project import Project
-from app.schemas.project import ProjectCreate, ProjectFileNode, ProjectFilesResponse
+from app.models.project import Project, utc_now
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectFileNode,
+    ProjectFilesResponse,
+    ProjectStructureResponse,
+    ProjectTechnologiesResponse,
+    ProjectStatisticsResponse,
+    ProjectScanResponse,
+)
+from app.services.repository_scanner import repository_scanner
+
 
 
 class ProjectService:
@@ -146,11 +156,30 @@ class ProjectService:
             project.source_type = "zip"
             project.status = "READY"
             project.error_message = None
+
+            # Run initial scan for language & technology discovery
+            try:
+                scan_data = repository_scanner.scan_repository(effective_path)
+                project.languages = scan_data["languages"]
+                project.frameworks = scan_data["frameworks"]
+                project.infrastructure = scan_data["infrastructure"]
+                project.stats = {
+                    "total_files": scan_data["total_files"],
+                    "total_directories": scan_data["total_directories"],
+                    "total_lines": scan_data["total_lines"],
+                    "categories": scan_data["categories"],
+                }
+                project.structure = scan_data["tree"]
+                project.last_analyzed_at = utc_now()
+            except Exception as scan_err:
+                logger.warning(f"Initial scan warning for {project_id}: {scan_err}")
+
             await db.commit()
             await db.refresh(project)
 
             logger.info(f"Successfully extracted ZIP for project {project_id} into {effective_path}")
             return project
+
 
         except (SecurityException, ValidationException):
             project.status = "FAILED"
@@ -206,11 +235,30 @@ class ProjectService:
             project.repository_path = str(target_dir)
             project.status = "READY"
             project.error_message = None
+
+            # Run initial scan for language & technology discovery
+            try:
+                scan_data = repository_scanner.scan_repository(target_dir)
+                project.languages = scan_data["languages"]
+                project.frameworks = scan_data["frameworks"]
+                project.infrastructure = scan_data["infrastructure"]
+                project.stats = {
+                    "total_files": scan_data["total_files"],
+                    "total_directories": scan_data["total_directories"],
+                    "total_lines": scan_data["total_lines"],
+                    "categories": scan_data["categories"],
+                }
+                project.structure = scan_data["tree"]
+                project.last_analyzed_at = utc_now()
+            except Exception as scan_err:
+                logger.warning(f"Initial scan warning for {project_id}: {scan_err}")
+
             await db.commit()
             await db.refresh(project)
 
             logger.info(f"Successfully cloned GitHub repo for project {project_id}")
             return project
+
 
         except Exception as e:
             project.status = "FAILED"
@@ -274,6 +322,112 @@ class ProjectService:
             total_files=total_files,
             files=file_tree,
         )
+
+    async def scan_project(self, project_id: str, db: AsyncSession) -> ProjectScanResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path)
+        if not base_path.exists() or not base_path.is_dir():
+            raise ValidationException(
+                message="Project repository directory does not exist or has not been uploaded yet.",
+                details={"repository_path": project.repository_path},
+            )
+
+        project.status = "ANALYZING"
+        await db.commit()
+
+        try:
+            scan_data = repository_scanner.scan_repository(base_path)
+            project.status = "ANALYZED"
+            project.languages = scan_data["languages"]
+            project.frameworks = scan_data["frameworks"]
+            project.infrastructure = scan_data["infrastructure"]
+            project.stats = {
+                "total_files": scan_data["total_files"],
+                "total_directories": scan_data["total_directories"],
+                "total_lines": scan_data["total_lines"],
+                "categories": scan_data["categories"],
+            }
+            project.structure = scan_data["tree"]
+            project.last_analyzed_at = utc_now()
+            project.error_message = None
+            await db.commit()
+            await db.refresh(project)
+
+            logger.info(f"Scan complete for project {project_id}: {scan_data['total_files']} files, {scan_data['total_lines']} lines")
+            return ProjectScanResponse(
+                project_id=project.id,
+                status=project.status,
+                total_files=scan_data["total_files"],
+                total_directories=scan_data["total_directories"],
+                total_lines=scan_data["total_lines"],
+                languages=scan_data["languages"],
+                frameworks=scan_data["frameworks"],
+                infrastructure=scan_data["infrastructure"],
+                scanned_at=project.last_analyzed_at or utc_now(),
+            )
+        except Exception as e:
+            project.status = "FAILED"
+            project.error_message = f"Scan failed: {str(e)}"
+            await db.commit()
+            logger.exception(f"Error scanning project {project_id}: {str(e)}")
+            raise StorageException(message=f"Failed to scan repository: {str(e)}")
+
+    async def get_project_structure(self, project_id: str, db: AsyncSession) -> ProjectStructureResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if (not project.structure or not project.structure.get("children")) and base_path and base_path.exists():
+            await self.scan_project(project_id, db)
+            project = await self.get_project(project_id, db)
+
+        tree_data = project.structure or {
+            "name": project.name,
+            "path": ".",
+            "type": "directory",
+            "children": [],
+        }
+        total_files = project.stats.get("total_files", 0) if project.stats else 0
+        total_dirs = project.stats.get("total_directories", 0) if project.stats else 0
+
+        return ProjectStructureResponse(
+            project_id=project.id,
+            total_files=total_files,
+            total_directories=total_dirs,
+            tree=tree_data,
+        )
+
+    async def get_project_technologies(self, project_id: str, db: AsyncSession) -> ProjectTechnologiesResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if not project.languages and base_path and base_path.exists():
+            await self.scan_project(project_id, db)
+            project = await self.get_project(project_id, db)
+
+        return ProjectTechnologiesResponse(
+            project_id=project.id,
+            languages=project.languages or {},
+            frameworks=project.frameworks or [],
+            infrastructure=project.infrastructure or [],
+        )
+
+    async def get_project_statistics(self, project_id: str, db: AsyncSession) -> ProjectStatisticsResponse:
+        project = await self.get_project(project_id, db)
+        base_path = Path(project.repository_path) if project.repository_path else None
+        if not project.stats and base_path and base_path.exists():
+            await self.scan_project(project_id, db)
+            project = await self.get_project(project_id, db)
+
+        stats = project.stats or {}
+        return ProjectStatisticsResponse(
+            project_id=project.id,
+            total_files=stats.get("total_files", 0),
+            total_directories=stats.get("total_directories", 0),
+            total_lines=stats.get("total_lines", 0),
+            languages=project.languages or {},
+            categories=stats.get("categories", {}),
+            frameworks=project.frameworks or [],
+            infrastructure=project.infrastructure or [],
+        )
+
 
 
 project_service = ProjectService()

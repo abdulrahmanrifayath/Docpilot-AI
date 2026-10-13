@@ -23,30 +23,75 @@ import {
   Upload,
   Calendar,
   ExternalLink,
+  Code2,
+  Cpu,
+  Server,
+  Terminal,
+  Activity,
+  Scan,
+  Check,
+  Search,
 } from 'lucide-react';
-import { Project, ProjectFileNode, ProjectFilesResponse } from '../types';
-import { fetchProject, fetchProjectFiles, uploadProjectZip, cloneProjectGit, deleteProject } from '../api/client';
+import {
+  Project,
+  ProjectStructureNode,
+  ProjectStructureResponse,
+  ProjectTechnologiesResponse,
+  ProjectStatisticsResponse,
+} from '../types';
+import {
+  fetchProject,
+  fetchProjectStructure,
+  fetchProjectTechnologies,
+  fetchProjectStatistics,
+  scanProject,
+  uploadProjectZip,
+  cloneProjectGit,
+  deleteProject,
+} from '../api/client';
 import { useProjects } from '../context/ProjectContext';
 
 // Recursive File Tree Node component
 interface FileTreeNodeProps {
-  node: ProjectFileNode;
+  node: ProjectStructureNode;
   level: number;
   selectedPath: string | null;
-  onSelect: (node: ProjectFileNode) => void;
+  onSelect: (node: ProjectStructureNode) => void;
+  searchFilter: string;
 }
 
-const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level, selectedPath, onSelect }) => {
+const FileTreeNode: React.FC<FileTreeNodeProps> = ({
+  node,
+  level,
+  selectedPath,
+  onSelect,
+  searchFilter,
+}) => {
   const [isOpen, setIsOpen] = useState<boolean>(level === 0 || level === 1);
   const isDirectory = node.type === 'directory';
   const isSelected = selectedPath === node.path;
 
-  const getFileIcon = (name: string) => {
-    const ext = name.split('.').pop()?.toLowerCase();
-    if (ext === 'md' || ext === 'txt') return <FileText className="w-3.5 h-3.5 text-slate-400" />;
-    if (ext === 'json' || ext === 'yaml' || ext === 'yml' || ext === 'toml')
+  // Filter matching
+  const hasMatchingChildren = (n: ProjectStructureNode): boolean => {
+    if (!searchFilter) return true;
+    if (n.name.toLowerCase().includes(searchFilter.toLowerCase())) return true;
+    if (n.children) {
+      return n.children.some(hasMatchingChildren);
+    }
+    return false;
+  };
+
+  if (searchFilter && !hasMatchingChildren(node)) {
+    return null;
+  }
+
+  const getFileIcon = (name: string, ext?: string) => {
+    const extension = (ext || name.split('.').pop() || '').toLowerCase();
+    if (extension === '.md' || extension === 'md' || extension === 'txt')
+      return <FileText className="w-3.5 h-3.5 text-slate-400" />;
+    if (['.json', '.yaml', '.yml', '.toml', 'json', 'yaml', 'yml'].includes(extension))
       return <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />;
-    if (['ts', 'tsx', 'js', 'jsx', 'py', 'go', 'rs', 'java', 'c', 'cpp'].includes(ext || ''))
+    if (['.ts', '.tsx', '.js', '.jsx', '.py', '.sql', '.html', '.css', 'ts', 'tsx', 'js', 'jsx', 'py'].includes(extension))
       return <FileCode className="w-3.5 h-3.5 text-brand-400" />;
     return <File className="w-3.5 h-3.5 text-slate-500" />;
   };
@@ -56,6 +101,23 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level, selectedPath, 
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getCategoryColor = (cat?: string) => {
+    switch (cat) {
+      case 'code':
+        return 'text-brand-400 bg-brand-500/10 border-brand-500/20';
+      case 'infrastructure':
+        return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+      case 'config':
+        return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+      case 'documentation':
+        return 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
+      case 'asset':
+        return 'text-purple-400 bg-purple-500/10 border-purple-500/20';
+      default:
+        return 'text-slate-400 bg-slate-800 border-slate-700';
+    }
   };
 
   return (
@@ -70,7 +132,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level, selectedPath, 
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         className={`flex items-center justify-between py-1.5 pr-3 rounded-lg text-xs cursor-pointer select-none transition-colors ${
           isSelected
-            ? 'bg-brand-600/20 text-white font-medium'
+            ? 'bg-brand-600/25 text-white font-medium shadow-sm'
             : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
         }`}
       >
@@ -91,16 +153,39 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level, selectedPath, 
           ) : (
             <>
               <span className="w-3.5 shrink-0" />
-              {getFileIcon(node.name)}
+              {getFileIcon(node.name, node.extension)}
             </>
           )}
           <span className="truncate">{node.name}</span>
         </div>
 
-        {!isDirectory && node.size !== undefined && (
-          <span className="text-[10px] text-slate-500 font-mono shrink-0 pl-2">
-            {formatBytes(node.size)}
-          </span>
+        {!isDirectory && (
+          <div className="flex items-center gap-2 shrink-0 pl-2">
+            {node.language && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-medium bg-slate-800 text-slate-300 border border-slate-700 hidden sm:inline">
+                {node.language}
+              </span>
+            )}
+            {node.file_category && (
+              <span
+                className={`text-[9px] px-1.5 py-0.2 rounded font-semibold uppercase tracking-wider border hidden md:inline ${getCategoryColor(
+                  node.file_category
+                )}`}
+              >
+                {node.file_category}
+              </span>
+            )}
+            {node.estimated_line_count !== undefined && node.estimated_line_count > 0 && (
+              <span className="text-[10px] text-slate-400 font-mono hidden lg:inline">
+                {node.estimated_line_count}L
+              </span>
+            )}
+            {node.file_size !== undefined && (
+              <span className="text-[10px] text-slate-500 font-mono">
+                {formatBytes(node.file_size)}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -113,6 +198,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, level, selectedPath, 
               level={level + 1}
               selectedPath={selectedPath}
               onSelect={onSelect}
+              searchFilter={searchFilter}
             />
           ))}
         </div>
@@ -127,11 +213,16 @@ export const ProjectDetailsPage: React.FC = () => {
   const { setActiveProject, refreshProjects } = useProjects();
 
   const [project, setProject] = useState<Project | null>(null);
-  const [filesData, setFilesData] = useState<ProjectFilesResponse | null>(null);
-  const [selectedFileNode, setSelectedFileNode] = useState<ProjectFileNode | null>(null);
+  const [structureData, setStructureData] = useState<ProjectStructureResponse | null>(null);
+  const [techData, setTechData] = useState<ProjectTechnologiesResponse | null>(null);
+  const [statsData, setStatsData] = useState<ProjectStatisticsResponse | null>(null);
+  const [selectedFileNode, setSelectedFileNode] = useState<ProjectStructureNode | null>(null);
+
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadingFiles, setLoadingFiles] = useState<boolean>(false);
+  const [scanning, setScanning] = useState<boolean>(false);
+  const [scanSuccess, setScanSuccess] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState<string>('');
 
   // Quick Action States
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -139,33 +230,46 @@ export const ProjectDetailsPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      loadProject(id);
-      loadFiles(id);
+      loadAllData(id);
     }
   }, [id]);
 
-  const loadProject = async (projId: string) => {
+  const loadAllData = async (projId: string) => {
     try {
       setLoading(true);
-      const proj = await fetchProject(projId);
+      const [proj, struct, tech, stats] = await Promise.all([
+        fetchProject(projId),
+        fetchProjectStructure(projId).catch(() => null),
+        fetchProjectTechnologies(projId).catch(() => null),
+        fetchProjectStatistics(projId).catch(() => null),
+      ]);
+
       setProject(proj);
       setActiveProject(proj);
+      setStructureData(struct);
+      setTechData(tech);
+      setStatsData(stats);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load project');
+      setErrorMsg(err.message || 'Failed to load project details');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadFiles = async (projId: string) => {
+  const handleScan = async () => {
+    if (!project) return;
+    setScanning(true);
+    setScanSuccess(false);
     try {
-      setLoadingFiles(true);
-      const files = await fetchProjectFiles(projId);
-      setFilesData(files);
+      await scanProject(project.id);
+      setScanSuccess(true);
+      await loadAllData(project.id);
+      await refreshProjects();
+      setTimeout(() => setScanSuccess(false), 3000);
     } catch (err: any) {
-      console.warn('Could not load files:', err.message);
+      alert(`Scan failed: ${err.message || err}`);
     } finally {
-      setLoadingFiles(false);
+      setScanning(false);
     }
   };
 
@@ -185,10 +289,9 @@ export const ProjectDetailsPage: React.FC = () => {
     if (!project || !uploadFile) return;
     setIsUploading(true);
     try {
-      const updated = await uploadProjectZip(project.id, uploadFile);
-      setProject(updated);
+      await uploadProjectZip(project.id, uploadFile);
       setUploadFile(null);
-      await loadFiles(project.id);
+      await loadAllData(project.id);
       await refreshProjects();
     } catch (err: any) {
       alert(`Upload failed: ${err.message || err}`);
@@ -201,9 +304,8 @@ export const ProjectDetailsPage: React.FC = () => {
     if (!project) return;
     setIsUploading(true);
     try {
-      const updated = await cloneProjectGit(project.id, project.source_url);
-      setProject(updated);
-      await loadFiles(project.id);
+      await cloneProjectGit(project.id, project.source_url);
+      await loadAllData(project.id);
       await refreshProjects();
     } catch (err: any) {
       alert(`Git Clone failed: ${err.message || err}`);
@@ -214,9 +316,9 @@ export const ProjectDetailsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-24 text-slate-400">
         <Loader2 className="w-8 h-8 animate-spin text-brand-500 mb-3" />
-        <span className="text-xs">Loading project details...</span>
+        <span className="text-xs">Analyzing and loading repository intelligence...</span>
       </div>
     );
   }
@@ -239,13 +341,20 @@ export const ProjectDetailsPage: React.FC = () => {
   }
 
   const isReady = project.status === 'READY' || project.status === 'ANALYZED';
-  const isPending = project.status === 'UPLOADING' || project.status === 'CLONING';
+  const isPending = project.status === 'UPLOADING' || project.status === 'CLONING' || project.status === 'ANALYZING';
   const isFailed = project.status === 'FAILED';
 
+  const totalFiles = statsData?.total_files ?? structureData?.total_files ?? 0;
+  const totalDirs = statsData?.total_directories ?? structureData?.total_directories ?? 0;
+  const totalLines = statsData?.total_lines ?? 0;
+  const languages = techData?.languages || statsData?.languages || project.languages || {};
+  const frameworks = techData?.frameworks || statsData?.frameworks || project.frameworks || [];
+  const infrastructure = techData?.infrastructure || statsData?.infrastructure || project.infrastructure || [];
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Top Breadcrumb & Actions Bar */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+    <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Top Header & Actions Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <Link
             to="/projects"
@@ -280,27 +389,42 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Scan Button */}
           <button
-            onClick={() => {
-              if (id) {
-                loadProject(id);
-                loadFiles(id);
-              }
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-all"
-            title="Refresh"
+            onClick={handleScan}
+            disabled={scanning || isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all ${
+              scanSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-600/25'
+            } disabled:opacity-50`}
+            title="Scan repository files, languages, and frameworks"
+          >
+            {scanning ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : scanSuccess ? (
+              <Check className="w-3.5 h-3.5" />
+            ) : (
+              <Scan className="w-3.5 h-3.5" />
+            )}
+            <span>{scanning ? 'Scanning...' : scanSuccess ? 'Scan Complete' : 'Scan Repository'}</span>
+          </button>
+
+          <button
+            onClick={() => id && loadAllData(id)}
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all"
+            title="Refresh Data"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
           </button>
+
           <button
             onClick={handleDelete}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30 transition-all"
+            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all"
             title="Delete Project"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete</span>
           </button>
         </div>
       </div>
@@ -316,58 +440,144 @@ export const ProjectDetailsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Metadata Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Source Type */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Source Type</span>
-          <div className="flex items-center gap-2 mt-2">
-            {project.source_type === 'zip' ? (
-              <Archive className="w-4 h-4 text-brand-400" />
-            ) : project.source_type === 'git' ? (
-              <GitBranch className="w-4 h-4 text-indigo-400" />
-            ) : (
-              <HardDrive className="w-4 h-4 text-cyan-400" />
-            )}
-            <span className="text-sm font-bold text-white uppercase">{project.source_type}</span>
+      {/* SECTION 1: PROJECT OVERVIEW METRICS */}
+      <div>
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5 text-brand-400" />
+          <span>Project Overview & Discovery Metrics</span>
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Files</span>
+            <p className="text-2xl font-extrabold text-white mt-1">{totalFiles.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">Sanitized source assets</span>
           </div>
-          {project.source_url && (
-            <a
-              href={project.source_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-brand-400 hover:text-brand-300 truncate block mt-1"
-            >
-              {project.source_url}
-            </a>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Directories</span>
+            <p className="text-2xl font-extrabold text-white mt-1">{totalDirs.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">Folder hierarchy nodes</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-brand-400">
+              Estimated Lines of Code
+            </span>
+            <p className="text-2xl font-extrabold text-brand-300 mt-1">{totalLines.toLocaleString()}</p>
+            <span className="text-[10px] text-slate-500 block mt-1">Non-binary text lines</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Last Analysis</span>
+            <p className="text-xs font-semibold text-white mt-2 truncate">
+              {project.last_analyzed_at
+                ? new Date(project.last_analyzed_at).toLocaleString()
+                : 'Scanned upon ingestion'}
+            </p>
+            <span className="text-[10px] text-slate-500 block mt-1">Static AST discovery</span>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2: TECHNOLOGY INTELLIGENCE (Languages, Frameworks, Infrastructure) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Languages Card */}
+        <div className="lg:col-span-1 p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-brand-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">Detected Languages</h3>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">{Object.keys(languages).length} found</span>
+          </div>
+
+          {Object.keys(languages).length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4 text-center">No supported languages identified yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(languages).map(([lang, stat]) => {
+                const percent = totalLines > 0 ? Math.round((stat.lines / totalLines) * 100) : 0;
+                return (
+                  <div key={lang} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-white">{lang}</span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {stat.files} files • {stat.lines.toLocaleString()} lines ({percent}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-brand-500 to-indigo-500 rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(4, percent))}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Isolated Storage Path */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sandbox Path</span>
-          <p className="text-xs font-mono text-slate-300 truncate mt-2" title={project.repository_path}>
-            {project.repository_path || 'Not allocated yet'}
-          </p>
-          <span className="text-[10px] text-slate-500 block mt-1">Safe isolated sandbox directory</span>
+        {/* Frameworks Card */}
+        <div className="lg:col-span-1 p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">Detected Frameworks</h3>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">{frameworks.length} detected</span>
+          </div>
+
+          {frameworks.length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4 text-center">No major frameworks detected in project.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {frameworks.map((fw) => (
+                <span
+                  key={fw}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold"
+                >
+                  <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{fw}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+            Detected via heuristic imports, pyproject.toml, requirements.txt, and package.json descriptors.
+          </div>
         </div>
 
-        {/* Created Timestamp */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Created At</span>
-          <p className="text-xs font-semibold text-white mt-2">
-            {new Date(project.created_at).toLocaleString()}
-          </p>
-          <span className="text-[10px] text-slate-500 block mt-1">Initial registration</span>
-        </div>
+        {/* Infrastructure Card */}
+        <div className="lg:col-span-1 p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">Infrastructure & DevOps</h3>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">{infrastructure.length} detected</span>
+          </div>
 
-        {/* Total Extracted Files */}
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Extracted Files</span>
-          <p className="text-xl font-bold text-white mt-1">
-            {filesData ? filesData.total_files : '...'}
-          </p>
-          <span className="text-[10px] text-slate-500 block mt-1">Sanitized source files</span>
+          {infrastructure.length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4 text-center">No container or cloud configurations found.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {infrastructure.map((inf) => (
+                <span
+                  key={inf}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold"
+                >
+                  <Server className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{inf}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+            Identifies Dockerfiles, Compose specs, GitHub Workflows, Kubernetes manifests, and Terraform files.
+          </div>
         </div>
       </div>
 
@@ -422,65 +632,65 @@ export const ProjectDetailsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Project File Tree Explorer Section */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+      {/* SECTION 3: EXPANDABLE REPOSITORY TREE */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 space-y-4">
+        {/* Tree Explorer Header & Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <Folder className="w-5 h-5 text-brand-400" />
-            <h2 className="text-sm font-bold text-white tracking-tight">Repository File Explorer</h2>
-            {filesData && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                {filesData.total_files} files
-              </span>
-            )}
+            <h2 className="text-sm font-bold text-white tracking-tight">Expandable Repository Tree</h2>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              {totalFiles} files
+            </span>
           </div>
-          <button
-            onClick={() => id && loadFiles(id)}
-            disabled={loadingFiles}
-            className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingFiles ? 'animate-spin text-brand-400' : ''}`} />
-            <span>Refresh Tree</span>
-          </button>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search repository files..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors"
+            />
+          </div>
         </div>
 
-        {loadingFiles ? (
-          <div className="py-16 text-center text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin text-brand-500 mx-auto mb-2" />
-            <p className="text-xs">Reading isolated project directory...</p>
-          </div>
-        ) : !filesData || filesData.files.length === 0 ? (
+        {/* Tree Content Area */}
+        {!structureData || !structureData.tree || (structureData.tree.children && structureData.tree.children.length === 0) ? (
           <div className="py-12 text-center text-slate-500">
             <Folder className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-400">No extracted files found</p>
+            <p className="text-xs font-semibold text-slate-400">No repository files scanned</p>
             <p className="text-[11px] text-slate-500 mt-1">
-              Ensure the project has finished uploading or cloning successfully.
+              Click &quot;Scan Repository&quot; to inspect files, extensions, lines, and categories.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Tree Navigation Column */}
-            <div className="lg:col-span-2 max-h-[500px] overflow-y-auto pr-2 border-r border-slate-800/80">
+            <div className="lg:col-span-2 max-h-[520px] overflow-y-auto pr-2 border-r border-slate-800/80">
               <div className="space-y-0.5">
-                {filesData.files.map((child) => (
-                  <FileTreeNode
-                    key={child.path}
-                    node={child}
-                    level={0}
-                    selectedPath={selectedFileNode?.path || null}
-                    onSelect={(n) => setSelectedFileNode(n)}
-                  />
-                ))}
+                {structureData.tree.children &&
+                  structureData.tree.children.map((child) => (
+                    <FileTreeNode
+                      key={child.path}
+                      node={child}
+                      level={0}
+                      selectedPath={selectedFileNode?.path || null}
+                      onSelect={(n) => setSelectedFileNode(n)}
+                      searchFilter={searchFilter}
+                    />
+                  ))}
               </div>
             </div>
 
             {/* Selected Node Details Column */}
             <div className="lg:col-span-1">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                File Details
+                File & Component Inspector
               </h3>
               {selectedFileNode ? (
-                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3.5">
                   <div>
                     <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                       Name
@@ -499,35 +709,57 @@ export const ProjectDetailsPage: React.FC = () => {
                     </p>
                   </div>
 
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                      Type
-                    </span>
-                    <p className="text-xs font-semibold text-slate-300 capitalize mt-0.5">
-                      {selectedFileNode.type}
-                    </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
+                        Category
+                      </span>
+                      <span className="font-semibold text-white capitalize mt-0.5 inline-block">
+                        {selectedFileNode.file_category || selectedFileNode.type}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
+                        Language
+                      </span>
+                      <span className="font-semibold text-brand-300 mt-0.5 inline-block">
+                        {selectedFileNode.language || 'Plain Text / Other'}
+                      </span>
+                    </div>
                   </div>
 
-                  {selectedFileNode.size !== undefined && (
+                  {selectedFileNode.estimated_line_count !== undefined && (
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                        Size
+                        Lines of Code
+                      </span>
+                      <p className="text-xs font-mono font-semibold text-white mt-0.5">
+                        {selectedFileNode.estimated_line_count.toLocaleString()} lines
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFileNode.file_size !== undefined && (
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                        File Size
                       </span>
                       <p className="text-xs font-semibold text-white mt-0.5">
-                        {selectedFileNode.size.toLocaleString()} bytes
+                        {selectedFileNode.file_size.toLocaleString()} bytes
                       </p>
                     </div>
                   )}
 
                   <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
                     <p>
-                      Files are stored in sandbox isolation. Source code parsing and documentation generation are enabled in Phase 3.
+                      Files are parsed statically. Phase 4 will generate interactive Mermaid architecture diagrams and dependency graphs.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center text-slate-500">
-                  <p className="text-xs">Select any file from the explorer tree to view its path and size.</p>
+                  <p className="text-xs">Select any file in the tree to inspect its path, language, category, and lines of code.</p>
                 </div>
               )}
             </div>

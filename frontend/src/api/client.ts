@@ -2,12 +2,17 @@ import {
   Project,
   ProjectCreatePayload,
   ProjectFilesResponse,
+  ProjectStructureResponse,
+  ProjectTechnologiesResponse,
+  ProjectStatisticsResponse,
+  ProjectScanResponse,
   SystemStatus,
   DocumentItem,
   DiagramItem,
   ChatMessage,
   ProviderSettings,
 } from '../types';
+
 
 const API_V1 = '/api/v1';
 
@@ -85,6 +90,36 @@ export async function fetchProjectFiles(id: string): Promise<ProjectFilesRespons
   if (!res.ok) throw new Error('Failed to fetch project files');
   return res.json();
 }
+
+export async function scanProject(id: string): Promise<ProjectScanResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/scan`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Scan failed' } }));
+    throw new Error(err.error?.message || 'Scan failed');
+  }
+  return res.json();
+}
+
+export async function fetchProjectStructure(id: string): Promise<ProjectStructureResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/structure`);
+  if (!res.ok) throw new Error('Failed to fetch project structure');
+  return res.json();
+}
+
+export async function fetchProjectTechnologies(id: string): Promise<ProjectTechnologiesResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/technologies`);
+  if (!res.ok) throw new Error('Failed to fetch project technologies');
+  return res.json();
+}
+
+export async function fetchProjectStatistics(id: string): Promise<ProjectStatisticsResponse> {
+  const res = await fetch(`${API_V1}/projects/${id}/statistics`);
+  if (!res.ok) throw new Error('Failed to fetch project statistics');
+  return res.json();
+}
+
 
 export async function fetchDocuments(projectId: string): Promise<DocumentItem[]> {
   const res = await fetch(`${API_V1}/repositories/${projectId}/documents`);

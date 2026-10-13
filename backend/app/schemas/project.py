@@ -36,10 +36,12 @@ class ProjectResponse(BaseModel):
     last_analyzed_at: Optional[datetime] = None
     languages: Dict[str, Any] = Field(default_factory=dict)
     frameworks: List[str] = Field(default_factory=list)
+    infrastructure: List[str] = Field(default_factory=list)
     stats: Dict[str, Any] = Field(default_factory=dict)
     structure: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
+
 
 
 class ProjectFileNode(BaseModel):
@@ -62,3 +64,53 @@ class SystemStatusResponse(BaseModel):
     database: Dict[str, Any]
     ai_provider: Dict[str, Any]
     vector_database: Dict[str, Any]
+
+
+class ProjectStructureNode(BaseModel):
+    name: str
+    path: str
+    type: str  # "file" or "directory"
+    extension: Optional[str] = None
+    file_size: Optional[int] = None
+    estimated_line_count: Optional[int] = None
+    file_category: Optional[str] = None
+    language: Optional[str] = None
+    children: Optional[List["ProjectStructureNode"]] = None
+
+
+class ProjectStructureResponse(BaseModel):
+    project_id: str
+    total_files: int
+    total_directories: int
+    tree: ProjectStructureNode
+
+
+class ProjectTechnologiesResponse(BaseModel):
+    project_id: str
+    languages: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    frameworks: List[str] = Field(default_factory=list)
+    infrastructure: List[str] = Field(default_factory=list)
+
+
+class ProjectStatisticsResponse(BaseModel):
+    project_id: str
+    total_files: int
+    total_directories: int
+    total_lines: int
+    languages: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    categories: Dict[str, int] = Field(default_factory=dict)
+    frameworks: List[str] = Field(default_factory=list)
+    infrastructure: List[str] = Field(default_factory=list)
+
+
+class ProjectScanResponse(BaseModel):
+    project_id: str
+    status: str
+    total_files: int
+    total_directories: int
+    total_lines: int
+    languages: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    frameworks: List[str] = Field(default_factory=list)
+    infrastructure: List[str] = Field(default_factory=list)
+    scanned_at: datetime
+

@@ -17,13 +17,64 @@ export interface Project {
   status: ProjectStatus;
   error_message?: string;
   last_analyzed_at?: string;
-  languages?: Record<string, LanguageStat>;
+  languages?: Record<string, { files: number; lines: number; percent?: number }>;
   frameworks?: string[];
-  stats?: RepositoryStats;
+  infrastructure?: string[];
+  stats?: Record<string, any>;
   structure?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
+
+export interface ProjectStructureNode {
+  name: string;
+  path: string;
+  type: 'directory' | 'file';
+  extension?: string;
+  file_size?: number;
+  estimated_line_count?: number;
+  file_category?: string;
+  language?: string;
+  children?: ProjectStructureNode[];
+}
+
+export interface ProjectStructureResponse {
+  project_id: string;
+  total_files: number;
+  total_directories: number;
+  tree: ProjectStructureNode;
+}
+
+export interface ProjectTechnologiesResponse {
+  project_id: string;
+  languages: Record<string, { files: number; lines: number; percent?: number }>;
+  frameworks: string[];
+  infrastructure: string[];
+}
+
+export interface ProjectStatisticsResponse {
+  project_id: string;
+  total_files: number;
+  total_directories: number;
+  total_lines: number;
+  languages: Record<string, { files: number; lines: number; percent?: number }>;
+  categories: Record<string, number>;
+  frameworks: string[];
+  infrastructure: string[];
+}
+
+export interface ProjectScanResponse {
+  project_id: string;
+  status: ProjectStatus;
+  total_files: number;
+  total_directories: number;
+  total_lines: number;
+  languages: Record<string, { files: number; lines: number; percent?: number }>;
+  frameworks: string[];
+  infrastructure: string[];
+  scanned_at: string;
+}
+
 
 export interface ProjectCreatePayload {
   name: string;

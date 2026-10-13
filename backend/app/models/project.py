@@ -41,8 +41,10 @@ class Project(Base):
     # Analysis metadata stored as JSON
     languages = Column(JSON, default=dict)
     frameworks = Column(JSON, default=list)
+    infrastructure = Column(JSON, default=list)
     stats = Column(JSON, default=dict)
     structure = Column(JSON, default=dict)
+
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
