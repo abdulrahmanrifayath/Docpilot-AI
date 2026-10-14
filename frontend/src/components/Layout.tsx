@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Github,
+  Compass,
 } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
 
@@ -27,6 +28,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Projects', path: '/projects', icon: FolderKanban },
+    { name: 'Onboarding', path: '/onboarding', icon: Compass },
     { name: 'Documentation', path: '/documentation', icon: FileText },
     { name: 'Architecture', path: '/architecture', icon: Workflow },
     { name: 'AI Assistant', path: '/chat', icon: Sparkles },
