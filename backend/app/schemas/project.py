@@ -549,6 +549,47 @@ class ChatHistoryClearResponse(BaseModel):
     deleted_count: int = 0
 
 
+# =============================================================================
+# PHASE 13: AUTOMATIC DEVELOPER ONBOARDING GUIDE SCHEMAS
+# =============================================================================
+
+class DetectedCommandItem(BaseModel):
+    command: str
+    source_file: str
+    description: Optional[str] = None
+    verified: bool = True
+    category: Optional[str] = None
+
+
+class OnboardingSection(BaseModel):
+    key: str
+    title: str
+    content: str
+    status: str = "DETECTED"  # DETECTED, PARTIAL, NOT_DETECTED
+    detected_commands: List[DetectedCommandItem] = Field(default_factory=list)
+    is_missing: bool = False
+    order: int = 1
+
+
+class OnboardingGenerateRequest(BaseModel):
+    force_regenerate: bool = Field(False, description="Whether to regenerate onboarding guide from active repository evidence")
+
+
+class OnboardingGuideResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    title: str = "Developer Onboarding Guide"
+    markdown_content: str
+    sections: List[OnboardingSection] = Field(default_factory=list)
+    detected_tools: List[str] = Field(default_factory=list)
+    missing_sections: List[str] = Field(default_factory=list)
+    version: int = 1
+    generated_at: Optional[datetime] = None
+
+
+
 
 
 
