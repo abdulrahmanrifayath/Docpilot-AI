@@ -66,14 +66,22 @@ class SequenceService:
         handler_lower = (ep.handler_name or "").lower()
         combined = f"{path_lower} {handler_lower}"
 
-        if any(k in combined for k in ("login", "token", "auth", "signin", "authenticate")):
-            return "AUTHENTICATION"
+        # 1. Registration takes priority over generic 'auth'
         if any(k in combined for k in ("register", "signup", "create_user", "sign_up")):
             return "REGISTRATION"
-        if any(k in combined for k in ("order", "checkout", "cart")):
-            return "ORDER"
-        if any(k in combined for k in ("pay", "payment", "charge", "billing", "invoice")):
+
+        # 2. Authentication
+        if any(k in combined for k in ("login", "signin", "sign_in", "authenticate", "token", "auth")):
+            return "AUTHENTICATION"
+
+        # 3. Payment takes priority over generic 'checkout'
+        if any(k in combined for k in ("payment", "charge", "billing", "invoice", "pay")):
             return "PAYMENT"
+
+        # 4. Order
+        if any(k in combined for k in ("order", "checkout", "cart", "purchase")):
+            return "ORDER"
+
         if ep.method in ("POST", "PUT", "PATCH", "DELETE"):
             return "DATA_MUTATION"
         return "GENERAL_FLOW"
