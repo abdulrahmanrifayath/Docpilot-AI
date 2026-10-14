@@ -38,6 +38,8 @@ import {
   SequenceDiagramItem,
   SequenceGeneratePayload,
   SequenceGenerateResponse,
+  OnboardingGuideResponse,
+  OnboardingGenerateRequest,
 } from '../types';
 
 
@@ -685,3 +687,43 @@ export async function clearChatHistory(
   }
   return res.json();
 }
+
+// ============================================================================
+// Phase 13: Developer Onboarding Guide
+// ============================================================================
+
+export async function generateOnboardingGuide(
+  projectId: string,
+  forceRegenerate: boolean = true
+): Promise<OnboardingGuideResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/onboarding/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ force_regenerate: forceRegenerate }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail?.message ||
+        errorData.detail ||
+        'Failed to generate onboarding guide'
+    );
+  }
+  return res.json();
+}
+
+export async function fetchOnboardingGuide(
+  projectId: string
+): Promise<OnboardingGuideResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/onboarding`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail?.message ||
+        errorData.detail ||
+        'Failed to fetch onboarding guide'
+    );
+  }
+  return res.json();
+}
+
