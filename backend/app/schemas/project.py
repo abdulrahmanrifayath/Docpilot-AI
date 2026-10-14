@@ -460,6 +460,59 @@ class DiagramGenerateResponse(BaseModel):
     message: Optional[str] = None
 
 
+# =============================================================================
+# PHASE 11: AUTOMATIC SEQUENCE DIAGRAM GENERATION SCHEMAS
+# =============================================================================
+
+class SequenceStep(BaseModel):
+    step_number: int
+    source: str
+    target: str
+    action: str
+    return_action: Optional[str] = None
+    confidence: float = Field(0.90, ge=0.0, le=1.0)
+    step_type: str = Field("INTERACTION", description="USER_INTERACTION, HTTP_REQUEST, FUNCTION_CALL, DATABASE_QUERY, RETURN")
+
+
+class SequenceDiagramResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str
+    name: str
+    flow_key: str
+    description: Optional[str] = None
+    trigger_endpoint: Optional[str] = None
+    trigger_method: Optional[str] = None
+    flow_category: str
+    mermaid_code: str
+    steps: List[SequenceStep] = Field(default_factory=list)
+    involved_components: List[str] = Field(default_factory=list)
+    overall_confidence: float = 0.85
+    execution_type: str = "Static analysis-based interaction flow"
+    is_guaranteed: bool = False
+    version: int = 1
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("metadata_json", "metadata"))
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class SequenceGenerateRequest(BaseModel):
+    flow_categories: Optional[List[str]] = Field(
+        None,
+        description="Filter categories: AUTHENTICATION, REGISTRATION, ORDER, PAYMENT, DATA_MUTATION, GENERAL_FLOW",
+    )
+    force_regenerate: bool = Field(False, description="Whether to overwrite existing sequence diagrams and increment version")
+
+
+class SequenceGenerateResponse(BaseModel):
+    status: str
+    project_id: str
+    total_generated: int
+    sequences: List[SequenceDiagramResponse] = Field(default_factory=list)
+    message: Optional[str] = None
+
+
 
 
 
