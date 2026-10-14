@@ -9,6 +9,7 @@ import { ProjectDetailsPage } from './pages/ProjectDetailsPage';
 import { DocumentationPage } from './pages/DocumentationPage';
 import { DiagramsPage } from './pages/DiagramsPage';
 import { AIChatPage } from './pages/AIChatPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 export const App: React.FC = () => {
