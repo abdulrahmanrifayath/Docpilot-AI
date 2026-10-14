@@ -34,6 +34,9 @@ import {
   DiagramGenerateResponse,
   ChatMessage,
   ProviderSettings,
+  SequenceDiagramItem,
+  SequenceGeneratePayload,
+  SequenceGenerateResponse,
 } from '../types';
 
 
@@ -517,6 +520,60 @@ export async function regenerateProjectDiagram(
 }
 
 export const fetchDiagrams = fetchProjectDiagrams;
+
+// =============================================================================
+// PHASE 11: AUTOMATIC SEQUENCE DIAGRAM GENERATION CLIENT
+// =============================================================================
+
+export async function generateSequences(
+  projectId: string,
+  payload?: SequenceGeneratePayload
+): Promise<SequenceGenerateResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/sequences/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || 'Failed to generate sequence diagrams');
+  }
+  return res.json();
+}
+
+export async function fetchProjectSequences(
+  projectId: string,
+  flowCategory?: string
+): Promise<SequenceDiagramItem[]> {
+  const query = flowCategory ? `?flow_category=${encodeURIComponent(flowCategory)}` : '';
+  const res = await fetch(`${API_V1}/projects/${projectId}/sequences${query}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchProjectSequence(
+  projectId: string,
+  sequenceId: string
+): Promise<SequenceDiagramItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/sequences/${sequenceId}`);
+  if (!res.ok) throw new Error('Failed to fetch sequence diagram');
+  return res.json();
+}
+
+export async function regenerateProjectSequence(
+  projectId: string,
+  sequenceId: string
+): Promise<SequenceDiagramItem> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/sequences/${sequenceId}/regenerate`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || 'Failed to regenerate sequence diagram');
+  }
+  return res.json();
+}
+
 
 export async function fetchChatHistory(projectId: string): Promise<ChatMessage[]> {
   const res = await fetch(`${API_V1}/repositories/${projectId}/chat`);

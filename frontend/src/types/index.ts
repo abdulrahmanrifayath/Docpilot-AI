@@ -586,5 +586,63 @@ export interface DocumentGenerateResponse {
   message?: string;
 }
 
+// =============================================================================
+// PHASE 11: AUTOMATIC SEQUENCE DIAGRAM GENERATION TYPES
+// =============================================================================
+
+export type SequenceFlowCategory =
+  | 'AUTHENTICATION'
+  | 'REGISTRATION'
+  | 'ORDER'
+  | 'PAYMENT'
+  | 'DATA_MUTATION'
+  | 'GENERAL_FLOW'
+  | string;
+
+export interface SequenceStep {
+  step_number: number;
+  source: string;
+  target: string;
+  action: string;
+  return_action?: string | null;
+  confidence: number;
+  step_type: 'USER_INTERACTION' | 'HTTP_REQUEST' | 'FUNCTION_CALL' | 'DATABASE_QUERY' | 'RETURN' | string;
+}
+
+export interface SequenceDiagramItem {
+  id: string;
+  project_id: string;
+  name: string;
+  flow_key: string;
+  description?: string | null;
+  trigger_endpoint?: string | null;
+  trigger_method?: string | null;
+  flow_category: SequenceFlowCategory;
+  mermaid_code: string;
+  steps: SequenceStep[];
+  involved_components: string[];
+  overall_confidence: number;
+  execution_type: string;
+  is_guaranteed: boolean;
+  version: number;
+  metadata?: Record<string, any>;
+  metadata_json?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SequenceGeneratePayload {
+  flow_categories?: string[];
+  force_regenerate?: boolean;
+}
+
+export interface SequenceGenerateResponse {
+  status: string;
+  project_id: string;
+  total_generated: number;
+  sequences: SequenceDiagramItem[];
+  message?: string;
+}
+
 
 
