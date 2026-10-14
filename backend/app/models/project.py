@@ -61,10 +61,12 @@ class Project(Base):
     database_relationships = relationship("DatabaseRelationship", back_populates="project", cascade="all, delete-orphan")
     knowledge_nodes = relationship("KnowledgeNode", back_populates="project", cascade="all, delete-orphan")
     knowledge_edges = relationship("KnowledgeEdge", back_populates="project", cascade="all, delete-orphan")
+    sequence_diagrams = relationship("SequenceDiagram", back_populates="project", cascade="all, delete-orphan")
 
     # Convenient synonyms
     entities = synonym("code_entities")
     dependencies = synonym("dependency_relationships")
+    sequences = synonym("sequence_diagrams")
 
 
 class CodeEntity(Base):
@@ -285,6 +287,32 @@ class Diagram(Base):
 
     project = relationship("Project", back_populates="diagrams")
     repository = synonym("project")
+
+
+class SequenceDiagram(Base):
+    __tablename__ = "sequence_diagrams"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    flow_key = Column(String(255), nullable=False, index=True)
+    description = Column(String(500), nullable=True)
+    trigger_endpoint = Column(String(255), nullable=True, index=True)
+    trigger_method = Column(String(20), nullable=True, default="POST")
+    flow_category = Column(String(50), nullable=False, default="GENERAL_FLOW", index=True)  # AUTHENTICATION, REGISTRATION, ORDER, PAYMENT, DATA_MUTATION, GENERAL_FLOW
+    mermaid_code = Column(Text, nullable=False)
+    steps = Column(JSON, default=list)
+    involved_components = Column(JSON, default=list)
+    overall_confidence = Column(Float, nullable=False, default=0.85)
+    execution_type = Column(String(100), nullable=False, default="Static analysis-based interaction flow")
+    is_guaranteed = Column(Boolean, default=False, nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    project = relationship("Project", back_populates="sequence_diagrams")
 
 
 class ChatMessage(Base):
