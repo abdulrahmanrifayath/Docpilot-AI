@@ -66,9 +66,12 @@ from app.schemas.project import (
     DocumentGenerateResponse,
     DiagramResponse,
     DiagramGenerateResponse,
+    SequenceDiagramResponse,
+    SequenceGenerateResponse,
 )
 from app.services.documentation_service import documentation_service
 from app.services.diagram_service import diagram_service
+from app.services.sequence_service import sequence_service
 from app.services.repository_scanner import repository_scanner
 
 
@@ -1467,6 +1470,59 @@ class ProjectService:
         return await diagram_service.regenerate_diagram(
             project_id=project_id,
             diagram_id=diagram_id,
+            db=db,
+        )
+
+    # -------------------------------------------------------------------------
+    # Phase 11: Automatic Sequence Diagram Generation
+    # -------------------------------------------------------------------------
+    async def generate_sequences(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        flow_categories: Optional[List[str]] = None,
+        force_regenerate: bool = False,
+    ) -> SequenceGenerateResponse:
+        return await sequence_service.generate_sequences(
+            project_id=project_id,
+            db=db,
+            flow_categories=flow_categories,
+            force_regenerate=force_regenerate,
+        )
+
+    async def list_sequences(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        flow_category: Optional[str] = None,
+    ) -> List[SequenceDiagramResponse]:
+        return await sequence_service.list_sequences(
+            project_id=project_id,
+            db=db,
+            flow_category=flow_category,
+        )
+
+    async def get_sequence_by_id(
+        self,
+        project_id: str,
+        sequence_id: str,
+        db: AsyncSession,
+    ) -> SequenceDiagramResponse:
+        return await sequence_service.get_sequence_by_id(
+            project_id=project_id,
+            sequence_id=sequence_id,
+            db=db,
+        )
+
+    async def regenerate_sequence(
+        self,
+        project_id: str,
+        sequence_id: str,
+        db: AsyncSession,
+    ) -> SequenceDiagramResponse:
+        return await sequence_service.regenerate_sequence(
+            project_id=project_id,
+            sequence_id=sequence_id,
             db=db,
         )
 

@@ -35,6 +35,9 @@ from app.schemas.project import (
     DiagramGenerateRequest,
     DiagramResponse,
     DiagramGenerateResponse,
+    SequenceGenerateRequest,
+    SequenceDiagramResponse,
+    SequenceGenerateResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
