@@ -54,6 +54,13 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <Link
+            to="/login"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-all"
+          >
+            <span>Sign In</span>
+          </Link>
+
+          <Link
             to="/dashboard"
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-md shadow-brand-600/25 transition-all"
           >

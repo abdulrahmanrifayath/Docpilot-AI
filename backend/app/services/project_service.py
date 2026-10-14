@@ -18,6 +18,7 @@ from app.core.exceptions import (
     SecurityException,
     StorageException,
     GitCloneException,
+    AuthorizationException,
 )
 from app.core.logging import logger
 from app.models.project import (
@@ -96,12 +97,13 @@ from app.ai.chat_service import chat_service
 
 
 class ProjectService:
-    async def create_project(self, payload: ProjectCreate, db: AsyncSession) -> Project:
+    async def create_project(self, payload: ProjectCreate, db: AsyncSession, user_id: Optional[str] = None) -> Project:
         project_id = str(uuid.uuid4())
         project_dir = settings.PROJECTS_DIR / project_id
 
         project = Project(
             id=project_id,
+            user_id=user_id,
             name=payload.name.strip(),
             description=payload.description.strip() if payload.description else None,
             source_type=payload.source_type,
@@ -113,21 +115,28 @@ class ProjectService:
         db.add(project)
         await db.commit()
         await db.refresh(project)
-        logger.info(f"Created project '{project.name}' (ID: {project.id}) with status '{project.status}'")
+        logger.info(f"Created project '{project.name}' (ID: {project.id}) with status '{project.status}' (Owner: {user_id})")
         return project
 
-    async def get_project(self, project_id: str, db: AsyncSession) -> Project:
+    async def get_project(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> Project:
         project = await db.get(Project, project_id)
         if not project:
             raise EntityNotFoundException("Project", project_id)
+        if user_id and project.user_id and project.user_id != user_id:
+            raise AuthorizationException("You do not have permission to access this project.")
         return project
 
-    async def list_projects(self, db: AsyncSession) -> List[Project]:
-        result = await db.execute(select(Project).order_by(Project.created_at.desc()))
+    async def list_projects(self, db: AsyncSession, user_id: Optional[str] = None) -> List[Project]:
+        if user_id:
+            result = await db.execute(
+                select(Project).where(Project.user_id == user_id).order_by(Project.created_at.desc())
+            )
+        else:
+            result = await db.execute(select(Project).order_by(Project.created_at.desc()))
         return list(result.scalars().all())
 
-    async def delete_project(self, project_id: str, db: AsyncSession) -> None:
-        project = await self.get_project(project_id, db)
+    async def delete_project(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> None:
+        project = await self.get_project(project_id, db, user_id=user_id)
 
         # Clean up project filesystem workspace
         project_dir = Path(project.repository_path) if project.repository_path else settings.PROJECTS_DIR / project_id

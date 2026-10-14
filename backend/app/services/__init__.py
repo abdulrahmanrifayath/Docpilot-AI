@@ -7,8 +7,11 @@ from app.services.indexer_service import project_indexer_service, ProjectIndexer
 from app.services.onboarding_service import onboarding_service, OnboardingService
 from app.services.github_service import github_service, GitHubService
 from app.services.report_service import report_service, ReportService
+from app.services.auth_service import auth_service, AuthService
 
 __all__ = [
+    "auth_service",
+    "AuthService",
     "pipeline_service",
     "PipelineService",
     "sync_service",

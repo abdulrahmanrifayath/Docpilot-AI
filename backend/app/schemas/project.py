@@ -28,6 +28,7 @@ class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    user_id: Optional[str] = None
     name: str
     description: Optional[str] = None
     source_type: str

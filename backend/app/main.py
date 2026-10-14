@@ -20,6 +20,7 @@ from app.api.chat import router as chat_router
 from app.api.sync import router as sync_router
 from app.api.settings import router as settings_router
 from app.api.v1.github import router as v1_github_router
+from app.api.v1.auth import router as v1_auth_router
 
 
 @asynccontextmanager
@@ -130,6 +131,7 @@ async def health_check():
 
 # API Version 1 Routers
 app.include_router(v1_system_router, prefix="/api/v1")
+app.include_router(v1_auth_router, prefix="/api/v1")
 app.include_router(v1_projects_router, prefix="/api/v1")
 
 # Additional modules under /api/v1 and /api

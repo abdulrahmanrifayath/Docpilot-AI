@@ -50,12 +50,84 @@ import {
   GitHubRefreshResponse,
   ReportGenerateRequest,
   TechnicalReportResponse,
+  User,
+  UserRegisterRequest,
+  UserLoginRequest,
+  AuthResponse,
 } from '../types';
 
-
-
-
 const API_V1 = '/api/v1';
+
+// Token storage helpers
+export function getAuthToken(): string | null {
+  return localStorage.getItem('docpilot_token');
+}
+
+export function setAuthToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem('docpilot_token', token);
+  } else {
+    localStorage.removeItem('docpilot_token');
+  }
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// ============================================================================
+// Phase 17: Authentication API Methods
+// ============================================================================
+
+export async function registerUser(payload: UserRegisterRequest): Promise<AuthResponse> {
+  const res = await fetch(`${API_V1}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Registration failed' } }));
+    throw new Error(err.error?.message || err.detail || 'Registration failed');
+  }
+  const data: AuthResponse = await res.json();
+  setAuthToken(data.access_token);
+  return data;
+}
+
+export async function loginUser(payload: UserLoginRequest): Promise<AuthResponse> {
+  const res = await fetch(`${API_V1}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: 'Invalid email or password' } }));
+    throw new Error(err.error?.message || err.detail || 'Invalid email or password');
+  }
+  const data: AuthResponse = await res.json();
+  setAuthToken(data.access_token);
+  return data;
+}
+
+export async function fetchCurrentUser(): Promise<User> {
+  const token = getAuthToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(`${API_V1}/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    setAuthToken(null);
+    throw new Error('Session expired or invalid');
+  }
+  return res.json();
+}
+
+export function logoutUser(): void {
+  setAuthToken(null);
+}
 
 export async function fetchSystemStatus(): Promise<SystemStatus> {
   const res = await fetch(`${API_V1}/system/status`);
@@ -64,13 +136,17 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
 }
 
 export async function fetchProjects(): Promise<Project[]> {
-  const res = await fetch(`${API_V1}/projects`);
+  const res = await fetch(`${API_V1}/projects`, {
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
 
 export async function fetchProject(id: string): Promise<Project> {
-  const res = await fetch(`${API_V1}/projects/${id}`);
+  const res = await fetch(`${API_V1}/projects/${id}`, {
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: 'Project not found' } }));
     throw new Error(err.error?.message || 'Failed to fetch project');
@@ -81,7 +157,7 @@ export async function fetchProject(id: string): Promise<Project> {
 export async function createProject(payload: ProjectCreatePayload): Promise<Project> {
   const res = await fetch(`${API_V1}/projects`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -94,6 +170,7 @@ export async function createProject(payload: ProjectCreatePayload): Promise<Proj
 export async function deleteProject(id: string): Promise<void> {
   const res = await fetch(`${API_V1}/projects/${id}`, {
     method: 'DELETE',
+    headers: { ...getAuthHeaders() },
   });
   if (!res.ok) throw new Error('Failed to delete project');
 }

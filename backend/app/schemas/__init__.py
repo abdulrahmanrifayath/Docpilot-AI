@@ -6,6 +6,12 @@ from app.schemas.project import (
     ProjectFilesResponse,
     SystemStatusResponse,
 )
+from app.schemas.user import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    UserResponse,
+    AuthResponse,
+)
 from app.schemas.repository import (
     RepositoryCreate,
     RepositoryResponse,
@@ -21,6 +27,10 @@ from app.schemas.repository import (
 )
 
 __all__ = [
+    "UserRegisterRequest",
+    "UserLoginRequest",
+    "UserResponse",
+    "AuthResponse",
     "ProjectCreate",
     "ProjectCloneRequest",
     "ProjectResponse",

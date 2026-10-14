@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -14,8 +14,11 @@ import {
   AlertTriangle,
   Github,
   Compass,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +26,8 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { projects, activeProject, setActiveProject, systemStatus } = useProjects();
 
   const navItems = [
@@ -36,6 +41,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   const isOperational = systemStatus?.status === 'operational';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col md:flex-row">
@@ -83,6 +93,30 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             );
           })}
         </nav>
+
+        {/* User Account & Logout */}
+        <div className="p-3 border-t border-slate-800/80 bg-slate-900/40">
+          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="min-w-0 truncate">
+                <p className="text-xs font-bold text-white truncate leading-tight">
+                  {user?.full_name || user?.email?.split('@')[0] || 'Developer'}
+                </p>
+                <p className="text-[10px] text-slate-500 truncate">{user?.email || 'Authenticated'}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
         {/* Bottom System Status Mini Card */}
         <div className="p-4 border-t border-slate-800/80">
