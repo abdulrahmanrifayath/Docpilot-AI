@@ -618,6 +618,83 @@ async def regenerate_project_diagram(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
 
 
+# =============================================================================
+# PHASE 11: AUTOMATIC SEQUENCE DIAGRAM GENERATION ENDPOINTS
+# =============================================================================
+
+@router.post(
+    "/{project_id}/sequences/generate",
+    response_model=SequenceGenerateResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def generate_project_sequences(
+    project_id: str,
+    payload: Optional[SequenceGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> SequenceGenerateResponse:
+    """Generate sequence diagrams automatically for key application workflows."""
+    req = payload or SequenceGenerateRequest()
+    try:
+        return await project_service.generate_sequences(
+            project_id=project_id,
+            db=db,
+            flow_categories=req.flow_categories,
+            force_regenerate=req.force_regenerate,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.get("/{project_id}/sequences", response_model=List[SequenceDiagramResponse])
+async def list_project_sequences(
+    project_id: str,
+    flow_category: Optional[str] = Query(None, description="Filter by flow category (e.g. AUTHENTICATION, REGISTRATION, ORDER, PAYMENT)"),
+    db: AsyncSession = Depends(get_db),
+) -> List[SequenceDiagramResponse]:
+    """List all generated sequence diagrams for a project."""
+    await project_service.get_project(project_id, db)
+    return await project_service.list_sequences(
+        project_id=project_id,
+        db=db,
+        flow_category=flow_category,
+    )
+
+
+@router.get("/{project_id}/sequences/{sequence_id}", response_model=SequenceDiagramResponse)
+async def get_project_sequence(
+    project_id: str,
+    sequence_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SequenceDiagramResponse:
+    """Retrieve details and Mermaid sequence code of a specific generated workflow."""
+    try:
+        return await project_service.get_sequence_by_id(
+            project_id=project_id,
+            sequence_id=sequence_id,
+            db=db,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+@router.post("/{project_id}/sequences/{sequence_id}/regenerate", response_model=SequenceDiagramResponse)
+async def regenerate_project_sequence(
+    project_id: str,
+    sequence_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SequenceDiagramResponse:
+    """Regenerate a specific sequence diagram, refreshing analysis context and incrementing version."""
+    try:
+        return await project_service.regenerate_sequence(
+            project_id=project_id,
+            sequence_id=sequence_id,
+            db=db,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+
 
 
 
