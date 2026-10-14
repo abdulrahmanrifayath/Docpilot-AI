@@ -75,12 +75,16 @@ from app.schemas.project import (
     ChangeCheckResponse,
     ChangeReportResponse,
     ChangeUpdateRequest,
+    GitHubValidateResponse,
+    GitHubStatusResponse,
+    GitHubRefreshResponse,
 )
 from app.services.documentation_service import documentation_service
 from app.services.diagram_service import diagram_service
 from app.services.sequence_service import sequence_service
 from app.services.onboarding_service import onboarding_service
 from app.services.sync_service import sync_service
+from app.services.github_service import github_service
 from app.services.repository_scanner import repository_scanner
 from app.ai.chat_service import chat_service
 
@@ -256,6 +260,7 @@ class ProjectService:
         project_id: str,
         source_url: Optional[str],
         db: AsyncSession,
+        branch: Optional[str] = None,
     ) -> Project:
         project = await self.get_project(project_id, db)
         url_to_clone = (source_url or project.source_url or "").strip()
@@ -273,9 +278,13 @@ class ProjectService:
                 details={"provided_url": url_to_clone},
             )
 
+        target_branch = (branch or project.branch or "").strip()
+
         project.status = "CLONING"
         project.source_url = url_to_clone
         project.source_type = "git"
+        if target_branch:
+            project.branch = target_branch
         await db.commit()
 
         target_dir = settings.PROJECTS_DIR / project_id / "source"
@@ -284,13 +293,20 @@ class ProjectService:
         target_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            logger.info(f"Cloning GitHub repository {url_to_clone} to {target_dir}")
-            # Shallow clone depth=1 for fast and safe checkout without executing any code
-            Repo.clone_from(url_to_clone, str(target_dir), depth=1)
+            logger.info(f"Cloning GitHub repository {url_to_clone} (branch={target_branch or 'default'}) to {target_dir}")
+            clone_kwargs: Dict[str, Any] = {"depth": 1}
+            if target_branch:
+                clone_kwargs["branch"] = target_branch
 
+            Repo.clone_from(url_to_clone, str(target_dir), **clone_kwargs)
+
+            git_repo = Repo(str(target_dir))
             project.repository_path = str(target_dir)
             project.status = "READY"
             project.error_message = None
+            project.last_commit_sha = git_repo.head.commit.hexsha
+            if not target_branch and not git_repo.head.is_detached:
+                project.branch = git_repo.active_branch.name
 
             # Run initial scan for language & technology discovery
             try:
@@ -306,13 +322,15 @@ class ProjectService:
                 }
                 project.structure = scan_data["tree"]
                 project.last_analyzed_at = utc_now()
+                # Compute baseline file hashes
+                project.stats["file_hashes"] = sync_service._compute_file_hashes(target_dir)
             except Exception as scan_err:
                 logger.warning(f"Initial scan warning for {project_id}: {scan_err}")
 
             await db.commit()
             await db.refresh(project)
 
-            logger.info(f"Successfully cloned GitHub repo for project {project_id}")
+            logger.info(f"Successfully cloned GitHub repo for project {project_id} (commit={project.last_commit_sha[:8]})")
             return project
 
 
@@ -1684,6 +1702,39 @@ class ProjectService:
             force_all=force_all,
             document_types=document_types,
             regenerate_diagrams=regenerate_diagrams,
+        )
+
+    # -------------------------------------------------------------------------
+    # PHASE 15: GITHUB INTEGRATION
+    # -------------------------------------------------------------------------
+
+    async def validate_github_repo(
+        self,
+        url: str,
+        token: Optional[str] = None,
+        branch: Optional[str] = None,
+    ) -> GitHubValidateResponse:
+        return await github_service.validate_repository(url=url, token=token, branch=branch)
+
+    async def get_github_status(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> GitHubStatusResponse:
+        return await github_service.get_repository_status(project_id=project_id, db=db)
+
+    async def refresh_github_repo(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        branch: Optional[str] = None,
+        force_sync: bool = False,
+    ) -> GitHubRefreshResponse:
+        return await github_service.refresh_repository(
+            project_id=project_id,
+            db=db,
+            branch=branch,
+            force_sync=force_sync,
         )
 
 

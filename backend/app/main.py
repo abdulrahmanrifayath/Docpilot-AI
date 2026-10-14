@@ -19,6 +19,7 @@ from app.api.diagrams import router as diagrams_router
 from app.api.chat import router as chat_router
 from app.api.sync import router as sync_router
 from app.api.settings import router as settings_router
+from app.api.v1.github import router as v1_github_router
 
 
 @asynccontextmanager
@@ -137,6 +138,7 @@ app.include_router(diagrams_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(settings_router, prefix="/api/v1")
+app.include_router(v1_github_router, prefix="/api/v1")
 
 # Legacy/compat routes
 app.include_router(repositories_router, prefix="/api")

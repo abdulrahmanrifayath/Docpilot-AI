@@ -46,6 +46,9 @@ from app.schemas.project import (
     ChangeCheckResponse,
     ChangeReportResponse,
     ChangeUpdateRequest,
+    GitHubStatusResponse,
+    GitHubRefreshRequest,
+    GitHubRefreshResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -123,6 +126,7 @@ async def clone_project_git(
         project_id=project_id,
         source_url=payload.source_url,
         db=db,
+        branch=payload.branch,
     )
     return project
 
@@ -842,6 +846,46 @@ async def update_project_documentation(
         document_types=doc_types,
         regenerate_diagrams=regen_diagrams,
     )
+
+
+# -----------------------------------------------------------------------------
+# PHASE 15: GITHUB INTEGRATION ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@router.get("/{project_id}/github/status", response_model=GitHubStatusResponse)
+async def get_project_github_status(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> GitHubStatusResponse:
+    """
+    Check tracking branch status against remote GitHub repository.
+    Reports if workspace is up to date, behind remote commits, or diverged.
+    """
+    return await project_service.get_github_status(
+        project_id=project_id,
+        db=db,
+    )
+
+
+@router.post("/{project_id}/github/refresh", response_model=GitHubRefreshResponse)
+async def refresh_project_github(
+    project_id: str,
+    payload: Optional[GitHubRefreshRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> GitHubRefreshResponse:
+    """
+    Fetch and pull latest commits from remote GitHub repository on the active/selected branch.
+    If new commits are pulled, triggers incremental documentation and diagram synchronization.
+    """
+    branch = payload.branch if payload else None
+    force_sync = payload.force_sync if payload else False
+    return await project_service.refresh_github_repo(
+        project_id=project_id,
+        db=db,
+        branch=branch,
+        force_sync=force_sync,
+    )
+
 
 
 

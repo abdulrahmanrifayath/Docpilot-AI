@@ -21,8 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from git import Repo, GitCommandError
 import httpx
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from urllib.parse import urlparse
 from app.core.config import settings
 from app.core.exceptions import (
     EntityNotFoundException,
