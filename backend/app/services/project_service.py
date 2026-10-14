@@ -1615,6 +1615,35 @@ class ProjectService:
             deleted_count=deleted_count,
         )
 
+    # -------------------------------------------------------------------------
+    # Phase 13: Developer Onboarding Guide
+    # -------------------------------------------------------------------------
+
+    async def generate_onboarding_guide(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        force_regenerate: bool = False,
+    ) -> OnboardingGuideResponse:
+        await self.get_project(project_id, db)
+        return await onboarding_service.generate_guide(
+            project_id=project_id,
+            db=db,
+            force=force_regenerate,
+        )
+
+    async def get_onboarding_guide(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> OnboardingGuideResponse:
+        await self.get_project(project_id, db)
+        return await onboarding_service.get_or_generate_guide(
+            project_id=project_id,
+            db=db,
+            force_regenerate=False,
+        )
+
 
 project_service = ProjectService()
 

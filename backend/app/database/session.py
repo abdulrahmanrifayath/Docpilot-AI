@@ -39,6 +39,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
+    import app.models.project  # noqa: F401 - Register all models with Base.metadata
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         if "sqlite" in settings.DATABASE_URL:

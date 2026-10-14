@@ -41,6 +41,8 @@ from app.schemas.project import (
     ChatMessageCreate,
     ChatMessageResponse,
     ChatHistoryClearResponse,
+    OnboardingGenerateRequest,
+    OnboardingGuideResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -734,6 +736,43 @@ async def clear_project_chat_history(
 ) -> ChatHistoryClearResponse:
     """Clear conversation history for a project."""
     return await project_service.clear_chat_history(
+        project_id=project_id,
+        db=db,
+    )
+
+
+# -----------------------------------------------------------------------------
+# PHASE 13: AUTOMATIC DEVELOPER ONBOARDING GUIDE ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@router.post("/{project_id}/onboarding/generate", response_model=OnboardingGuideResponse)
+async def generate_project_onboarding_guide(
+    project_id: str,
+    payload: Optional[OnboardingGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> OnboardingGuideResponse:
+    """
+    Generate or regenerate a practical developer onboarding guide grounded in
+    verified repository configuration files, parsed AST, APIs, and sequence flows.
+    """
+    force = payload.force_regenerate if payload else True
+    return await project_service.generate_onboarding_guide(
+        project_id=project_id,
+        db=db,
+        force_regenerate=force,
+    )
+
+
+@router.get("/{project_id}/onboarding", response_model=OnboardingGuideResponse)
+async def get_project_onboarding_guide(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> OnboardingGuideResponse:
+    """
+    Retrieve the developer onboarding guide for an analyzed repository.
+    Automatically generates if not yet created.
+    """
+    return await project_service.get_onboarding_guide(
         project_id=project_id,
         db=db,
     )
