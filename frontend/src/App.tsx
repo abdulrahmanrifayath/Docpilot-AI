@@ -79,6 +79,14 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/sequences"
+            element={
+              <Layout>
+                <DiagramsPage defaultTab="SEQUENCE_DIAGRAM" />
+              </Layout>
+            }
+          />
+          <Route
             path="/chat"
             element={
               <Layout>
