@@ -15,7 +15,8 @@ def run_tests():
         # 2. List projects to find a target project
         r = client.get(f"{BASE_URL}/projects")
         assert r.status_code == 200
-        projects = r.json().get("projects", [])
+        projects_data = r.json()
+        projects = projects_data if isinstance(projects_data, list) else projects_data.get("projects", [])
         if not projects:
             print("No project found. Creating a test project...")
             r = client.post(f"{BASE_URL}/projects", json={
@@ -68,8 +69,8 @@ def run_tests():
         print("[OK] All 12 required sections verified present!")
 
         # Verify distinction types
-        distinction_types = {s["distinction"] for s in report_data["sections"]}
-        print(f"  Distinction types present: {distinction_types}")
+        distinction_types = {s["category"] for s in report_data["sections"]}
+        print(f"  Distinction categories present: {distinction_types}")
         assert "detected" in distinction_types, "Missing 'detected' distinction"
         assert "ai_generated" in distinction_types, "Missing 'ai_generated' distinction"
         assert "inferred" in distinction_types, "Missing 'inferred' distinction"
