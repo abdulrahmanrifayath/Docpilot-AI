@@ -270,6 +270,7 @@ class Document(Base):
 
     project = relationship("Project", back_populates="documents")
     repository = synonym("project")
+    history_versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan", order_by="desc(DocumentVersion.version)")
 
 
 class Diagram(Base):
