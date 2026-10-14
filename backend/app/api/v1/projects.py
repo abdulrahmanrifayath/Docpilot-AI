@@ -43,6 +43,9 @@ from app.schemas.project import (
     ChatHistoryClearResponse,
     OnboardingGenerateRequest,
     OnboardingGuideResponse,
+    ChangeCheckResponse,
+    ChangeReportResponse,
+    ChangeUpdateRequest,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -776,6 +779,70 @@ async def get_project_onboarding_guide(
         project_id=project_id,
         db=db,
     )
+
+
+# -----------------------------------------------------------------------------
+# PHASE 14: CHANGE DETECTION & DOCUMENTATION SYNCHRONIZATION ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@router.post("/{project_id}/changes/check", response_model=ChangeCheckResponse)
+async def check_project_changes(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ChangeCheckResponse:
+    """
+    Inspect repository for added, modified, and deleted files by comparing
+    the latest commit SHA against the previously analyzed commit SHA (with file-hash fallback).
+    Identifies affected entities, APIs, DB models, documents, and diagrams.
+    """
+    return await project_service.check_changes(
+        project_id=project_id,
+        db=db,
+    )
+
+
+@router.get("/{project_id}/changes", response_model=List[ChangeReportResponse])
+async def list_project_changes(
+    project_id: str,
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of historical change records to return"),
+    db: AsyncSession = Depends(get_db),
+) -> List[ChangeReportResponse]:
+    """
+    Retrieve historical change and synchronization reports for audit tracking.
+    """
+    return await project_service.get_change_history(
+        project_id=project_id,
+        db=db,
+        limit=limit,
+    )
+
+
+@router.post("/{project_id}/documentation/update", response_model=ChangeReportResponse)
+async def update_project_documentation(
+    project_id: str,
+    payload: Optional[ChangeUpdateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> ChangeReportResponse:
+    """
+    Incrementally synchronize repository documentation:
+    1. Detects changes between commits or file hashes.
+    2. Reanalyzes only affected files.
+    3. Archives previous document versions into document_versions.
+    4. Regenerates only affected documentation and diagrams with version increments.
+    5. Updates analyzed commit SHA and marks repository synchronized.
+    """
+    force = payload.force_all if payload else False
+    doc_types = payload.document_types if payload else None
+    regen_diagrams = payload.regenerate_diagrams if payload else True
+
+    return await project_service.update_documentation_and_sync(
+        project_id=project_id,
+        db=db,
+        force_all=force,
+        document_types=doc_types,
+        regenerate_diagrams=regen_diagrams,
+    )
+
 
 
 

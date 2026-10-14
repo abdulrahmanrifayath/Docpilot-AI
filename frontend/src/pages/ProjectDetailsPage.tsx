@@ -78,6 +78,7 @@ import { APIExplorer } from '../components/APIExplorer';
 import { DatabaseSchemaExplorer } from '../components/DatabaseSchemaExplorer';
 import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
 import { SequenceFlowExplorer } from '../components/SequenceFlowExplorer';
+import { SyncManager } from '../components/SyncManager';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -755,6 +756,15 @@ export const ProjectDetailsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* PHASE 14: CHANGE DETECTION & DOCUMENTATION SYNCHRONIZATION */}
+      <SyncManager
+        project={project}
+        onSyncComplete={() => {
+          if (id) loadAllData(id);
+          refreshProjects();
+        }}
+      />
 
       {/* SECTION 1: PROJECT OVERVIEW METRICS */}
       <div>

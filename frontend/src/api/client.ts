@@ -40,6 +40,9 @@ import {
   SequenceGenerateResponse,
   OnboardingGuideResponse,
   OnboardingGenerateRequest,
+  ChangeCheckResponse,
+  ChangeReportResponse,
+  ChangeUpdateRequest,
 } from '../types';
 
 
@@ -726,4 +729,56 @@ export async function fetchOnboardingGuide(
   }
   return res.json();
 }
+
+// ============================================================================
+// Phase 14: Change Detection and Documentation Synchronization
+// ============================================================================
+
+export async function checkProjectChanges(
+  projectId: string
+): Promise<ChangeCheckResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/changes/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail?.message ||
+        errorData.detail ||
+        'Failed to check for changes'
+    );
+  }
+  return res.json();
+}
+
+export async function fetchProjectChanges(
+  projectId: string,
+  limit: number = 10
+): Promise<ChangeReportResponse[]> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/changes?limit=${limit}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function updateProjectDocumentation(
+  projectId: string,
+  payload?: ChangeUpdateRequest
+): Promise<ChangeReportResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/documentation/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail?.message ||
+        errorData.detail ||
+        'Failed to synchronize documentation'
+    );
+  }
+  return res.json();
+}
+
 

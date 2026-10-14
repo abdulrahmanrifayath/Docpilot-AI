@@ -622,3 +622,6 @@ class AutomaticAPIDiscoveryService:
         elif isinstance(node, ast.Tuple):
             return f"({', '.join(self._format_node(e) for e in node.elts)})"
         return ""
+
+
+api_discovery_service = AutomaticAPIDiscoveryService()

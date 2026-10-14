@@ -17,6 +17,8 @@ export interface Project {
   status: ProjectStatus;
   error_message?: string;
   last_analyzed_at?: string;
+  last_commit_sha?: string;
+  sync_status?: 'SYNCED' | 'OUT_OF_SYNC' | 'SYNCING' | 'FAILED' | string;
   languages?: Record<string, { files: number; lines: number; percent?: number }>;
   frameworks?: string[];
   infrastructure?: string[];
@@ -698,6 +700,83 @@ export interface OnboardingGuideResponse {
   version: number;
   generated_at?: string;
 }
+
+// ============================================================================
+// Phase 14: Change Detection and Documentation Synchronization Types
+// ============================================================================
+
+export interface ChangeCheckResponse {
+  project_id: string;
+  has_changes: boolean;
+  previous_commit_sha?: string | null;
+  current_commit_sha?: string | null;
+  files_added: string[];
+  files_modified: string[];
+  files_deleted: string[];
+  total_files_changed: number;
+  affected_entities: string[];
+  affected_apis: string[];
+  affected_db_models: string[];
+  affected_documents: string[];
+  affected_diagrams: string[];
+  summary: string;
+}
+
+export interface DocumentVersionItem {
+  id: string;
+  document_id: string;
+  version: number;
+  document_type: string;
+  title: string;
+  target_path?: string | null;
+  commit_sha?: string | null;
+  archived_at?: string;
+}
+
+export interface UpdatedDocumentItem {
+  document_id: string;
+  title: string;
+  document_type: string;
+  target_path?: string | null;
+  version: number;
+  previous_version?: number | null;
+}
+
+export interface UpdatedDiagramItem {
+  diagram_id: string;
+  title: string;
+  diagram_type: string;
+  version: number;
+}
+
+export interface ChangeReportResponse {
+  id: string;
+  project_id: string;
+  status: 'SYNCED' | 'NO_CHANGES' | 'FAILED' | string;
+  previous_commit_sha?: string | null;
+  current_commit_sha?: string | null;
+  files_changed: {
+    added: string[];
+    modified: string[];
+    deleted: string[];
+  };
+  total_files_changed: number;
+  entities_affected: string[];
+  apis_affected: string[];
+  db_models_affected: string[];
+  documentation_updated: UpdatedDocumentItem[];
+  diagrams_updated: UpdatedDiagramItem[];
+  created_at?: string;
+  message: string;
+  error_message?: string | null;
+}
+
+export interface ChangeUpdateRequest {
+  force_all?: boolean;
+  document_types?: string[];
+  regenerate_diagrams?: boolean;
+}
+
 
 
 
