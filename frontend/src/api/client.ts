@@ -111,15 +111,15 @@ export async function uploadProjectZip(id: string, file: File): Promise<Project>
   return res.json();
 }
 
-export async function cloneProjectGit(id: string, sourceUrl?: string): Promise<Project> {
+export async function cloneProjectGit(id: string, sourceUrl?: string, branch?: string): Promise<Project> {
   const res = await fetch(`${API_V1}/projects/${id}/clone`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source_url: sourceUrl }),
+    body: JSON.stringify({ source_url: sourceUrl, branch: branch || undefined }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: 'Clone failed' } }));
-    throw new Error(err.error?.message || 'Clone failed');
+    throw new Error(err.error?.message || err.detail?.message || 'Clone failed');
   }
   return res.json();
 }
