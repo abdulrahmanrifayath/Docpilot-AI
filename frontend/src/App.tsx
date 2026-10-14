@@ -96,6 +96,14 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/onboarding"
+            element={
+              <Layout>
+                <OnboardingPage />
+              </Layout>
+            }
+          />
+          <Route
             path="/settings"
             element={
               <Layout>
