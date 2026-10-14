@@ -76,3 +76,23 @@ class GitCloneException(DocPilotException):
             status_code=400,
             details=details,
         )
+
+
+class AuthenticationException(DocPilotException):
+    def __init__(self, message: str = "Could not validate credentials", details: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(
+            message=message,
+            code="AUTHENTICATION_FAILED",
+            status_code=401,
+            details=details,
+        )
+
+
+class AuthorizationException(DocPilotException):
+    def __init__(self, message: str = "You do not have access to this resource", details: Optional[Dict[str, Any]] = None) -> None:
+        super().__init__(
+            message=message,
+            code="FORBIDDEN",
+            status_code=403,
+            details=details,
+        )

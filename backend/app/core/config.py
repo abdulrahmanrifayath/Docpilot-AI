@@ -77,6 +77,11 @@ class Settings(BaseSettings):
     # Integrations
     GITHUB_TOKEN: Optional[str] = None
 
+    # Authentication & Security
+    JWT_SECRET_KEY: str = "docpilot-ai-super-secret-jwt-encryption-key-production-ready-32bytes"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
     def ensure_directories(self) -> None:
         self.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
