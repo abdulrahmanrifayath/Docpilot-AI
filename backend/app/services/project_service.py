@@ -157,8 +157,9 @@ class ProjectService:
         filename: str,
         file_bytes: bytes,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> Project:
-        project = await self.get_project(project_id, db)
+        project = await self.get_project(project_id, db, user_id=user_id)
 
         # 1. Validate file extension
         if not filename.lower().endswith(".zip"):
@@ -273,8 +274,9 @@ class ProjectService:
         source_url: Optional[str],
         db: AsyncSession,
         branch: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Project:
-        project = await self.get_project(project_id, db)
+        project = await self.get_project(project_id, db, user_id=user_id)
         url_to_clone = (source_url or project.source_url or "").strip()
 
         # 1. Validate GitHub URL format
@@ -356,8 +358,8 @@ class ProjectService:
                 details={"url": url_to_clone},
             )
 
-    async def list_project_files(self, project_id: str, db: AsyncSession) -> ProjectFilesResponse:
-        project = await self.get_project(project_id, db)
+    async def list_project_files(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectFilesResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path)
 
         if not base_path.exists() or not base_path.is_dir():
@@ -409,8 +411,8 @@ class ProjectService:
             files=file_tree,
         )
 
-    async def scan_project(self, project_id: str, db: AsyncSession) -> ProjectScanResponse:
-        project = await self.get_project(project_id, db)
+    async def scan_project(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectScanResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path)
         if not base_path.exists() or not base_path.is_dir():
             raise ValidationException(
@@ -458,8 +460,8 @@ class ProjectService:
             logger.exception(f"Error scanning project {project_id}: {str(e)}")
             raise StorageException(message=f"Failed to scan repository: {str(e)}")
 
-    async def get_project_structure(self, project_id: str, db: AsyncSession) -> ProjectStructureResponse:
-        project = await self.get_project(project_id, db)
+    async def get_project_structure(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectStructureResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if (not project.structure or not project.structure.get("children")) and base_path and base_path.exists():
             await self.scan_project(project_id, db)
@@ -481,8 +483,8 @@ class ProjectService:
             tree=tree_data,
         )
 
-    async def get_project_technologies(self, project_id: str, db: AsyncSession) -> ProjectTechnologiesResponse:
-        project = await self.get_project(project_id, db)
+    async def get_project_technologies(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectTechnologiesResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if not project.languages and base_path and base_path.exists():
             await self.scan_project(project_id, db)
@@ -495,8 +497,8 @@ class ProjectService:
             infrastructure=project.infrastructure or [],
         )
 
-    async def get_project_statistics(self, project_id: str, db: AsyncSession) -> ProjectStatisticsResponse:
-        project = await self.get_project(project_id, db)
+    async def get_project_statistics(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectStatisticsResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if not project.stats and base_path and base_path.exists():
             await self.scan_project(project_id, db)
@@ -514,8 +516,8 @@ class ProjectService:
             infrastructure=project.infrastructure or [],
         )
 
-    async def parse_project_code(self, project_id: str, db: AsyncSession) -> ProjectParseResponse:
-        project = await self.get_project(project_id, db)
+    async def parse_project_code(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> ProjectParseResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if not base_path or not base_path.exists() or not base_path.is_dir():
             raise ValidationException(
@@ -624,8 +626,9 @@ class ProjectService:
         entity_type: Optional[str] = None,
         file_path: Optional[str] = None,
         name: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[CodeEntity]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(CodeEntity).where(CodeEntity.project_id == project_id)
 
         if entity_type:
@@ -649,8 +652,9 @@ class ProjectService:
         project_id: str,
         entity_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> CodeEntity:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(CodeEntity).where(
             CodeEntity.project_id == project_id,
             CodeEntity.id == entity_id,
@@ -666,8 +670,9 @@ class ProjectService:
         project_id: str,
         file_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> List[CodeEntity]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
 
         # Decode file_id (supports raw path, URL-encoded path, or Base64-encoded path)
         candidates = [file_id]
@@ -710,8 +715,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DependencyAnalysisResponse:
-        project = await self.get_project(project_id, db)
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if not base_path or not base_path.exists() or not base_path.is_dir():
             raise ValidationException(
@@ -789,8 +795,9 @@ class ProjectService:
         target: Optional[str] = None,
         is_external: Optional[bool] = None,
         min_confidence: Optional[float] = None,
+        user_id: Optional[str] = None,
     ) -> List[DependencyRelationship]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(DependencyRelationship).where(DependencyRelationship.project_id == project_id)
 
         if relationship_type:
@@ -812,8 +819,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DependencyGraphResponse:
-        project = await self.get_project(project_id, db)
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
 
         # Fetch existing nodes and relationships
@@ -858,8 +866,9 @@ class ProjectService:
         project_id: str,
         entity_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> EntityDependenciesResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
 
         # 1. Find matching node
         node_query = select(DependencyNode).where(
@@ -922,8 +931,8 @@ class ProjectService:
     # PHASE 6: AUTOMATIC API DISCOVERY
     # =========================================================================
 
-    async def analyze_apis(self, project_id: str, db: AsyncSession) -> APIAnalysisResponse:
-        project = await self.get_project(project_id, db)
+    async def analyze_apis(self, project_id: str, db: AsyncSession, user_id: Optional[str] = None) -> APIAnalysisResponse:
+        project = await self.get_project(project_id, db, user_id=user_id)
         base_path = Path(project.repository_path) if project.repository_path else None
         if not base_path or not base_path.exists() or not base_path.is_dir():
             raise ValidationException(
@@ -1001,8 +1010,9 @@ class ProjectService:
         tag: Optional[str] = None,
         auth_required: Optional[bool] = None,
         search: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[APIEndpoint]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(APIEndpoint).where(APIEndpoint.project_id == project_id)
 
         if method:
@@ -1034,8 +1044,9 @@ class ProjectService:
         project_id: str,
         api_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> APIEndpointDetailResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
 
         # Look up by id or handler_name
         query = select(APIEndpoint).where(
@@ -1113,8 +1124,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DatabaseAnalysisResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         project_dir = settings.PROJECTS_DIR / project_id
 
         # 1. Run static database structure analysis (no SQL execution)
@@ -1240,8 +1252,9 @@ class ProjectService:
         db: AsyncSession,
         orm_type: Optional[str] = None,
         search: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[DatabaseModel]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(DatabaseModel).where(DatabaseModel.project_id == project_id)
 
         if orm_type:
@@ -1263,8 +1276,9 @@ class ProjectService:
         db: AsyncSession,
         model_name: Optional[str] = None,
         relationship_type: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[DatabaseRelationship]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         query = select(DatabaseRelationship).where(DatabaseRelationship.project_id == project_id)
 
         if model_name:
@@ -1283,8 +1297,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DatabaseDiagramResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
 
         # Check existing stored models & relationships
         query_models = select(DatabaseModel).where(DatabaseModel.project_id == project_id).order_by(DatabaseModel.name.asc())
@@ -1360,7 +1375,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> KnowledgeBuildResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await knowledge_graph_service.build_knowledge_graph(project_id, db)
 
     async def get_knowledge_graph(
@@ -1373,7 +1390,9 @@ class ProjectService:
         depth: int = 2,
         limit: int = 150,
         offset: int = 0,
+        user_id: Optional[str] = None,
     ) -> KnowledgeGraphResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await knowledge_graph_service.get_knowledge_graph(
             project_id=project_id,
             db=db,
@@ -1390,7 +1409,9 @@ class ProjectService:
         project_id: str,
         entity_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> KnowledgeEntityDetailResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await knowledge_graph_service.get_entity_knowledge(
             project_id=project_id,
             entity_id=entity_id,
@@ -1408,7 +1429,9 @@ class ProjectService:
         target_path: Optional[str] = None,
         target_entity_id: Optional[str] = None,
         force_regenerate: bool = False,
+        user_id: Optional[str] = None,
     ) -> DocumentGenerateResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await documentation_service.generate_documentation(
             project_id=project_id,
             db=db,
@@ -1424,7 +1447,9 @@ class ProjectService:
         db: AsyncSession,
         document_type: Optional[str] = None,
         search: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[DocumentResponse]:
+        await self.get_project(project_id, db, user_id=user_id)
         return await documentation_service.get_documents(
             project_id=project_id,
             db=db,
@@ -1437,7 +1462,9 @@ class ProjectService:
         project_id: str,
         document_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DocumentResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await documentation_service.get_document_by_id(
             project_id=project_id,
             document_id=document_id,
@@ -1449,7 +1476,9 @@ class ProjectService:
         project_id: str,
         document_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DocumentResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await documentation_service.regenerate_document(
             project_id=project_id,
             document_id=document_id,
@@ -1467,7 +1496,9 @@ class ProjectService:
         include_flow_data: bool = True,
         use_llm_enhancement: bool = False,
         force_regenerate: bool = False,
+        user_id: Optional[str] = None,
     ) -> DiagramGenerateResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await diagram_service.generate_all_diagrams(
             project_id=project_id,
             diagram_types=diagram_types,
@@ -1482,7 +1513,9 @@ class ProjectService:
         project_id: str,
         db: AsyncSession,
         diagram_type: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[DiagramResponse]:
+        await self.get_project(project_id, db, user_id=user_id)
         return await diagram_service.list_diagrams(
             project_id=project_id,
             db=db,
@@ -1494,7 +1527,9 @@ class ProjectService:
         project_id: str,
         diagram_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DiagramResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await diagram_service.get_diagram_by_id(
             project_id=project_id,
             diagram_id=diagram_id,
@@ -1506,7 +1541,9 @@ class ProjectService:
         project_id: str,
         diagram_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> DiagramResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await diagram_service.regenerate_diagram(
             project_id=project_id,
             diagram_id=diagram_id,
@@ -1522,7 +1559,9 @@ class ProjectService:
         db: AsyncSession,
         flow_categories: Optional[List[str]] = None,
         force_regenerate: bool = False,
+        user_id: Optional[str] = None,
     ) -> SequenceGenerateResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await sequence_service.generate_sequences(
             project_id=project_id,
             db=db,
@@ -1535,7 +1574,9 @@ class ProjectService:
         project_id: str,
         db: AsyncSession,
         flow_category: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> List[SequenceDiagramResponse]:
+        await self.get_project(project_id, db, user_id=user_id)
         return await sequence_service.list_sequences(
             project_id=project_id,
             db=db,
@@ -1547,7 +1588,9 @@ class ProjectService:
         project_id: str,
         sequence_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> SequenceDiagramResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await sequence_service.get_sequence_by_id(
             project_id=project_id,
             sequence_id=sequence_id,
@@ -1559,7 +1602,9 @@ class ProjectService:
         project_id: str,
         sequence_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> SequenceDiagramResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await sequence_service.regenerate_sequence(
             project_id=project_id,
             sequence_id=sequence_id,
@@ -1574,8 +1619,9 @@ class ProjectService:
         project_id: str,
         content: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> ChatMessageResponse:
-        project = await self.get_project(project_id, db)
+        project = await self.get_project(project_id, db, user_id=user_id)
         clean_content = content.strip()
         if not clean_content:
             raise ValidationException(message="Message content cannot be empty")
@@ -1622,8 +1668,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> List[ChatMessageResponse]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         stmt = (
             select(ChatMessage)
             .where(ChatMessage.project_id == project_id)
@@ -1637,8 +1684,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> ChatHistoryClearResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         stmt = delete(ChatMessage).where(ChatMessage.project_id == project_id)
         result = await db.execute(stmt)
         await db.commit()
@@ -1658,8 +1706,9 @@ class ProjectService:
         project_id: str,
         db: AsyncSession,
         force_regenerate: bool = False,
+        user_id: Optional[str] = None,
     ) -> OnboardingGuideResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         return await onboarding_service.generate_guide(
             project_id=project_id,
             db=db,
@@ -1670,8 +1719,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> OnboardingGuideResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         return await onboarding_service.get_or_generate_guide(
             project_id=project_id,
             db=db,
@@ -1686,8 +1736,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> ChangeCheckResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         return await sync_service.detect_changes(project_id, db)
 
     async def get_change_history(
@@ -1695,8 +1746,9 @@ class ProjectService:
         project_id: str,
         db: AsyncSession,
         limit: int = 10,
+        user_id: Optional[str] = None,
     ) -> List[ChangeReportResponse]:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         return await sync_service.get_change_history(project_id, db, limit=limit)
 
     async def update_documentation_and_sync(
@@ -1706,8 +1758,9 @@ class ProjectService:
         force_all: bool = False,
         document_types: Optional[List[str]] = None,
         regenerate_diagrams: bool = True,
+        user_id: Optional[str] = None,
     ) -> ChangeReportResponse:
-        await self.get_project(project_id, db)
+        await self.get_project(project_id, db, user_id=user_id)
         return await sync_service.update_documentation_and_sync(
             project_id=project_id,
             db=db,
@@ -1732,7 +1785,9 @@ class ProjectService:
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> GitHubStatusResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await github_service.get_repository_status(project_id=project_id, db=db)
 
     async def refresh_github_repo(
@@ -1741,7 +1796,9 @@ class ProjectService:
         db: AsyncSession,
         branch: Optional[str] = None,
         force_sync: bool = False,
+        user_id: Optional[str] = None,
     ) -> GitHubRefreshResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await github_service.refresh_repository(
             project_id=project_id,
             db=db,
@@ -1758,14 +1815,18 @@ class ProjectService:
         project_id: str,
         payload: ReportGenerateRequest,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> TechnicalReportResponse:
+        await self.get_project(project_id, db, user_id=user_id)
         return await report_service.generate_report(project_id=project_id, payload=payload, db=db)
 
     async def list_project_reports(
         self,
         project_id: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> List[TechnicalReportResponse]:
+        await self.get_project(project_id, db, user_id=user_id)
         return await report_service.list_reports(project_id=project_id, db=db)
 
     async def export_project_report(
@@ -1774,7 +1835,9 @@ class ProjectService:
         report_id: str,
         format_type: str,
         db: AsyncSession,
+        user_id: Optional[str] = None,
     ) -> Tuple[bytes, str, str]:
+        await self.get_project(project_id, db, user_id=user_id)
         return await report_service.export_report(
             project_id=project_id,
             report_id=report_id,

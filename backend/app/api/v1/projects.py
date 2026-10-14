@@ -110,6 +110,7 @@ async def delete_project(
 async def upload_project_zip(
     project_id: str,
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectResponse:
     """Upload and securely unpack a project ZIP archive into an isolated directory."""
@@ -119,6 +120,7 @@ async def upload_project_zip(
         filename=file.filename or "project.zip",
         file_bytes=file_bytes,
         db=db,
+        user_id=current_user.id,
     )
     return project
 
@@ -127,6 +129,7 @@ async def upload_project_zip(
 async def clone_project_git(
     project_id: str,
     payload: ProjectCloneRequest = ProjectCloneRequest(),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectResponse:
     """Clone a public GitHub repository into an isolated project workspace."""
@@ -134,6 +137,7 @@ async def clone_project_git(
         project_id=project_id,
         source_url=payload.source_url,
         db=db,
+        user_id=current_user.id,
         branch=payload.branch,
     )
     return project
@@ -142,60 +146,66 @@ async def clone_project_git(
 @router.get("/{project_id}/files", response_model=ProjectFilesResponse)
 async def list_project_files(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectFilesResponse:
     """List file hierarchy and sizes within the project repository path."""
-    files_resp = await project_service.list_project_files(project_id, db)
+    files_resp = await project_service.list_project_files(project_id, db, user_id=current_user.id)
     return files_resp
 
 
 @router.post("/{project_id}/scan", response_model=ProjectScanResponse)
 async def scan_project(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectScanResponse:
     """Trigger static file discovery, language analysis, and technology detection without an LLM."""
-    result = await project_service.scan_project(project_id, db)
+    result = await project_service.scan_project(project_id, db, user_id=current_user.id)
     return result
 
 
 @router.get("/{project_id}/structure", response_model=ProjectStructureResponse)
 async def get_project_structure(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectStructureResponse:
     """Retrieve hierarchical repository tree structure with file categories and estimated line counts."""
-    result = await project_service.get_project_structure(project_id, db)
+    result = await project_service.get_project_structure(project_id, db, user_id=current_user.id)
     return result
 
 
 @router.get("/{project_id}/technologies", response_model=ProjectTechnologiesResponse)
 async def get_project_technologies(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectTechnologiesResponse:
     """Retrieve detected programming languages, frameworks, and infrastructure components."""
-    result = await project_service.get_project_technologies(project_id, db)
+    result = await project_service.get_project_technologies(project_id, db, user_id=current_user.id)
     return result
 
 
 @router.get("/{project_id}/statistics", response_model=ProjectStatisticsResponse)
 async def get_project_statistics(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectStatisticsResponse:
     """Retrieve project-level metrics including file counts, lines of code, and language distribution."""
-    result = await project_service.get_project_statistics(project_id, db)
+    result = await project_service.get_project_statistics(project_id, db, user_id=current_user.id)
     return result
 
 
 @router.post("/{project_id}/parse", response_model=ProjectParseResponse)
 async def parse_project_code(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ProjectParseResponse:
     """Trigger static code parsing engine (Python AST, JS/TS Tree-sitter) without AI."""
-    result = await project_service.parse_project_code(project_id, db)
+    result = await project_service.parse_project_code(project_id, db, user_id=current_user.id)
     return result
 
 
@@ -205,12 +215,14 @@ async def list_project_entities(
     entity_type: Optional[str] = Query(None, description="Filter by entity type (MODULE, CLASS, FUNCTION, METHOD, INTERFACE, COMPONENT)"),
     file_path: Optional[str] = Query(None, description="Filter by file path"),
     name: Optional[str] = Query(None, description="Search by entity name"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[CodeEntityResponse]:
     """Retrieve normalized code entities extracted across the project."""
     entities = await project_service.get_project_entities(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         entity_type=entity_type,
         file_path=file_path,
         name=name,
@@ -222,6 +234,7 @@ async def list_project_entities(
 async def get_project_entity(
     project_id: str,
     entity_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> CodeEntityResponse:
     """Retrieve a single code entity by its unique ID."""
@@ -229,6 +242,7 @@ async def get_project_entity(
         project_id=project_id,
         entity_id=entity_id,
         db=db,
+        user_id=current_user.id,
     )
     return entity
 
@@ -237,6 +251,7 @@ async def get_project_entity(
 async def list_file_entities(
     project_id: str,
     file_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[CodeEntityResponse]:
     """Retrieve normalized code entities for a specific file path or file identifier."""
@@ -244,6 +259,7 @@ async def list_file_entities(
         project_id=project_id,
         file_id=file_id,
         db=db,
+        user_id=current_user.id,
     )
     return entities
 
@@ -251,10 +267,11 @@ async def list_file_entities(
 @router.post("/{project_id}/dependencies/analyze", response_model=DependencyAnalysisResponse)
 async def analyze_project_dependencies(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DependencyAnalysisResponse:
     """Analyze static dependencies, imports, class inheritance, calls, and external packages."""
-    result = await project_service.analyze_dependencies(project_id, db)
+    result = await project_service.analyze_dependencies(project_id, db, user_id=current_user.id)
     return result
 
 
@@ -266,12 +283,14 @@ async def list_project_dependencies(
     target: Optional[str] = Query(None, description="Filter by target node or entity name"),
     is_external: Optional[bool] = Query(None, description="Filter by external or internal dependency"),
     min_confidence: Optional[float] = Query(None, description="Filter by minimum confidence score (0.0 - 1.0)"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[DependencyRelationshipResponse]:
     """Retrieve flat list of detected dependencies and relationships with confidence scores."""
     dependencies = await project_service.get_dependencies(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         relationship_type=relationship_type,
         source=source,
         target=target,
@@ -284,10 +303,11 @@ async def list_project_dependencies(
 @router.get("/{project_id}/dependencies/graph", response_model=DependencyGraphResponse)
 async def get_project_dependency_graph(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DependencyGraphResponse:
     """Retrieve complete graph structure with nodes, edges, metadata, and statistics for React Flow."""
-    graph = await project_service.get_dependency_graph(project_id, db)
+    graph = await project_service.get_dependency_graph(project_id, db, user_id=current_user.id)
     return graph
 
 
@@ -295,6 +315,7 @@ async def get_project_dependency_graph(
 async def get_entity_dependencies(
     project_id: str,
     entity_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> EntityDependenciesResponse:
     """Retrieve inbound and outbound dependencies and neighbor nodes for a specific entity or node."""
@@ -302,6 +323,7 @@ async def get_entity_dependencies(
         project_id=project_id,
         entity_id=entity_id,
         db=db,
+        user_id=current_user.id,
     )
     return result
 
@@ -313,10 +335,11 @@ async def get_entity_dependencies(
 @router.post("/{project_id}/apis/analyze", response_model=APIAnalysisResponse)
 async def analyze_project_apis(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> APIAnalysisResponse:
     """Detect backend API endpoints from supported frameworks (FastAPI, Flask, Express)."""
-    result = await project_service.analyze_apis(project_id, db)
+    result = await project_service.analyze_apis(project_id, db, user_id=current_user.id)
     return result
 
 
@@ -327,12 +350,14 @@ async def list_project_apis(
     tag: Optional[str] = Query(None, description="Filter by API tag or route group"),
     auth_required: Optional[bool] = Query(None, description="Filter by authentication requirement"),
     search: Optional[str] = Query(None, description="Search path, handler name, or file path"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[APIEndpointResponse]:
     """Retrieve list of discovered API endpoints with request/response schemas and auth indicators."""
     endpoints = await project_service.get_apis(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         method=method,
         tag=tag,
         auth_required=auth_required,
@@ -345,6 +370,7 @@ async def list_project_apis(
 async def get_project_api_endpoint(
     project_id: str,
     api_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> APIEndpointDetailResponse:
     """Retrieve detailed API endpoint specification including parameters, schemas, and related components."""
@@ -352,6 +378,7 @@ async def get_project_api_endpoint(
         project_id=project_id,
         api_id=api_id,
         db=db,
+        user_id=current_user.id,
     )
     return endpoint
 
@@ -363,10 +390,11 @@ async def get_project_api_endpoint(
 @router.post("/{project_id}/database/analyze", response_model=DatabaseAnalysisResponse)
 async def analyze_project_database(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DatabaseAnalysisResponse:
     """Statically analyze database models, fields, and relationships from SQLAlchemy, Django ORM, and SQL schemas."""
-    return await project_service.analyze_database(project_id, db)
+    return await project_service.analyze_database(project_id, db, user_id=current_user.id)
 
 
 @router.get("/{project_id}/database/models", response_model=List[DatabaseModelResponse])
@@ -374,12 +402,14 @@ async def list_project_database_models(
     project_id: str,
     orm_type: Optional[str] = Query(None, description="Filter by ORM type (SQLAlchemy, Django, SQL)"),
     search: Optional[str] = Query(None, description="Search model name, table name, or file path"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[DatabaseModelResponse]:
     """Retrieve list of detected database models with fields, types, and primary/foreign keys."""
     models = await project_service.get_database_models(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         orm_type=orm_type,
         search=search,
     )
@@ -391,12 +421,14 @@ async def list_project_database_relationships(
     project_id: str,
     model_name: Optional[str] = Query(None, description="Filter by source or target model name"),
     relationship_type: Optional[str] = Query(None, description="Filter by relationship type (ONE_TO_ONE, ONE_TO_MANY, MANY_TO_MANY, FOREIGN_KEY)"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[DatabaseRelationshipResponse]:
     """Retrieve list of relationships between database entities."""
     relationships = await project_service.get_database_relationships(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         model_name=model_name,
         relationship_type=relationship_type,
     )
@@ -406,10 +438,11 @@ async def list_project_database_relationships(
 @router.get("/{project_id}/database/diagram", response_model=DatabaseDiagramResponse)
 async def get_project_database_diagram(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DatabaseDiagramResponse:
     """Generate Mermaid ER diagram syntax for project database models and relationships."""
-    return await project_service.get_database_diagram(project_id, db)
+    return await project_service.get_database_diagram(project_id, db, user_id=current_user.id)
 
 
 # =============================================================================
@@ -419,10 +452,11 @@ async def get_project_database_diagram(
 @router.post("/{project_id}/knowledge/build", response_model=KnowledgeBuildResponse)
 async def build_project_knowledge_graph(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeBuildResponse:
     """Combine results from scanner, code parser, dependency analyzer, API discovery, and database analyzer into a unified knowledge model."""
-    return await project_service.build_knowledge_graph(project_id, db)
+    return await project_service.build_knowledge_graph(project_id, db, user_id=current_user.id)
 
 
 @router.get("/{project_id}/knowledge/graph", response_model=KnowledgeGraphResponse)
@@ -434,6 +468,7 @@ async def get_project_knowledge_graph(
     depth: int = Query(2, ge=1, le=5, description="Depth radius around focus entity"),
     limit: int = Query(150, ge=1, le=500, description="Max nodes to return"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeGraphResponse:
     """Retrieve the unified project knowledge graph with filtering, search, focus mode, and pagination."""
@@ -441,6 +476,7 @@ async def get_project_knowledge_graph(
     return await project_service.get_knowledge_graph(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         node_types=types_list,
         search=search,
         focus_id=focus_id,
@@ -454,6 +490,7 @@ async def get_project_knowledge_graph(
 async def get_project_knowledge_entity_detail(
     project_id: str,
     entity_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeEntityDetailResponse:
     """Query entity knowledge details: what uses it, what it uses, connected APIs, and connected database models."""
@@ -461,6 +498,7 @@ async def get_project_knowledge_entity_detail(
         project_id=project_id,
         entity_id=entity_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -472,6 +510,7 @@ async def get_project_knowledge_entity_detail(
 async def generate_project_documentation(
     project_id: str,
     payload: Optional[DocumentGenerateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentGenerateResponse:
     """Generate high-quality AI documentation suite from structured repository analysis."""
@@ -480,6 +519,7 @@ async def generate_project_documentation(
         return await project_service.generate_documentation(
             project_id=project_id,
             db=db,
+        user_id=current_user.id,
             document_types=req.document_types,
             target_path=req.target_path,
             target_entity_id=req.target_entity_id,
@@ -504,13 +544,15 @@ async def list_project_documentation(
     project_id: str,
     document_type: Optional[str] = Query(None, description="Filter by document type (e.g. README, API_DOCS, DATABASE_DOCS)"),
     search: Optional[str] = Query(None, description="Search documentation title or content"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[DocumentResponse]:
     """List all generated technical documents for a project."""
-    await project_service.get_project(project_id, db)
+    await project_service.get_project(project_id, db, user_id=current_user.id)
     return await project_service.get_documents(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         document_type=document_type,
         search=search,
     )
@@ -520,6 +562,7 @@ async def list_project_documentation(
 async def get_project_document(
     project_id: str,
     document_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentResponse:
     """Retrieve full detail of a specific generated technical document."""
@@ -528,6 +571,7 @@ async def get_project_document(
             project_id=project_id,
             document_id=document_id,
             db=db,
+        user_id=current_user.id,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
@@ -537,6 +581,7 @@ async def get_project_document(
 async def regenerate_project_document(
     project_id: str,
     document_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentResponse:
     """Regenerate a specific document using updated/fresh repository context, bumping version."""
@@ -545,6 +590,7 @@ async def regenerate_project_document(
             project_id=project_id,
             document_id=document_id,
             db=db,
+        user_id=current_user.id,
         )
     except LLMNotConfiguredError as ex:
         raise HTTPException(
@@ -572,6 +618,7 @@ async def regenerate_project_document(
 async def generate_project_diagrams(
     project_id: str,
     payload: Optional[DiagramGenerateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DiagramGenerateResponse:
     """Generate architecture diagrams automatically from repository analysis."""
@@ -580,6 +627,7 @@ async def generate_project_diagrams(
         return await project_service.generate_diagrams(
             project_id=project_id,
             db=db,
+        user_id=current_user.id,
             diagram_types=req.diagram_types,
             include_flow_data=req.include_flow_data,
             use_llm_enhancement=req.use_llm_enhancement,
@@ -593,13 +641,15 @@ async def generate_project_diagrams(
 async def list_project_diagrams(
     project_id: str,
     diagram_type: Optional[str] = Query(None, description="Filter by diagram type (e.g. SYSTEM_ARCHITECTURE, MODULE_ARCHITECTURE, DEPENDENCY_DIAGRAM, API_SERVICE_RELATIONSHIP, DATABASE_ER)"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[DiagramResponse]:
     """List all generated architecture diagrams for a project."""
-    await project_service.get_project(project_id, db)
+    await project_service.get_project(project_id, db, user_id=current_user.id)
     return await project_service.list_diagrams(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         diagram_type=diagram_type,
     )
 
@@ -608,6 +658,7 @@ async def list_project_diagrams(
 async def get_project_diagram(
     project_id: str,
     diagram_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DiagramResponse:
     """Retrieve details and Mermaid code of a specific generated diagram."""
@@ -616,6 +667,7 @@ async def get_project_diagram(
             project_id=project_id,
             diagram_id=diagram_id,
             db=db,
+        user_id=current_user.id,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
@@ -625,6 +677,7 @@ async def get_project_diagram(
 async def regenerate_project_diagram(
     project_id: str,
     diagram_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> DiagramResponse:
     """Regenerate a specific diagram, refreshing analysis context and incrementing version."""
@@ -633,6 +686,7 @@ async def regenerate_project_diagram(
             project_id=project_id,
             diagram_id=diagram_id,
             db=db,
+        user_id=current_user.id,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
@@ -650,6 +704,7 @@ async def regenerate_project_diagram(
 async def generate_project_sequences(
     project_id: str,
     payload: Optional[SequenceGenerateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> SequenceGenerateResponse:
     """Generate sequence diagrams automatically for key application workflows."""
@@ -658,6 +713,7 @@ async def generate_project_sequences(
         return await project_service.generate_sequences(
             project_id=project_id,
             db=db,
+        user_id=current_user.id,
             flow_categories=req.flow_categories,
             force_regenerate=req.force_regenerate,
         )
@@ -669,13 +725,15 @@ async def generate_project_sequences(
 async def list_project_sequences(
     project_id: str,
     flow_category: Optional[str] = Query(None, description="Filter by flow category (e.g. AUTHENTICATION, REGISTRATION, ORDER, PAYMENT)"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[SequenceDiagramResponse]:
     """List all generated sequence diagrams for a project."""
-    await project_service.get_project(project_id, db)
+    await project_service.get_project(project_id, db, user_id=current_user.id)
     return await project_service.list_sequences(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         flow_category=flow_category,
     )
 
@@ -684,6 +742,7 @@ async def list_project_sequences(
 async def get_project_sequence(
     project_id: str,
     sequence_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> SequenceDiagramResponse:
     """Retrieve details and Mermaid sequence code of a specific generated workflow."""
@@ -692,6 +751,7 @@ async def get_project_sequence(
             project_id=project_id,
             sequence_id=sequence_id,
             db=db,
+        user_id=current_user.id,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
@@ -701,6 +761,7 @@ async def get_project_sequence(
 async def regenerate_project_sequence(
     project_id: str,
     sequence_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> SequenceDiagramResponse:
     """Regenerate a specific sequence diagram, refreshing analysis context and incrementing version."""
@@ -709,6 +770,7 @@ async def regenerate_project_sequence(
             project_id=project_id,
             sequence_id=sequence_id,
             db=db,
+        user_id=current_user.id,
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
@@ -722,6 +784,7 @@ async def regenerate_project_sequence(
 async def send_project_chat_message(
     project_id: str,
     payload: ChatMessageCreate,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ChatMessageResponse:
     """Ask a question about an analyzed repository using repository-aware RAG."""
@@ -729,30 +792,35 @@ async def send_project_chat_message(
         project_id=project_id,
         content=payload.content,
         db=db,
+        user_id=current_user.id,
     )
 
 
 @router.get("/{project_id}/chat/history", response_model=List[ChatMessageResponse])
 async def get_project_chat_history(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[ChatMessageResponse]:
     """Retrieve complete chat history for a project."""
     return await project_service.get_chat_history(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
 @router.delete("/{project_id}/chat/history", response_model=ChatHistoryClearResponse)
 async def clear_project_chat_history(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ChatHistoryClearResponse:
     """Clear conversation history for a project."""
     return await project_service.clear_chat_history(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -764,6 +832,7 @@ async def clear_project_chat_history(
 async def generate_project_onboarding_guide(
     project_id: str,
     payload: Optional[OnboardingGenerateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> OnboardingGuideResponse:
     """
@@ -774,6 +843,7 @@ async def generate_project_onboarding_guide(
     return await project_service.generate_onboarding_guide(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         force_regenerate=force,
     )
 
@@ -781,6 +851,7 @@ async def generate_project_onboarding_guide(
 @router.get("/{project_id}/onboarding", response_model=OnboardingGuideResponse)
 async def get_project_onboarding_guide(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> OnboardingGuideResponse:
     """
@@ -790,6 +861,7 @@ async def get_project_onboarding_guide(
     return await project_service.get_onboarding_guide(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -800,6 +872,7 @@ async def get_project_onboarding_guide(
 @router.post("/{project_id}/changes/check", response_model=ChangeCheckResponse)
 async def check_project_changes(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ChangeCheckResponse:
     """
@@ -810,6 +883,7 @@ async def check_project_changes(
     return await project_service.check_changes(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -817,6 +891,7 @@ async def check_project_changes(
 async def list_project_changes(
     project_id: str,
     limit: int = Query(10, ge=1, le=50, description="Maximum number of historical change records to return"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[ChangeReportResponse]:
     """
@@ -825,6 +900,7 @@ async def list_project_changes(
     return await project_service.get_change_history(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         limit=limit,
     )
 
@@ -833,6 +909,7 @@ async def list_project_changes(
 async def update_project_documentation(
     project_id: str,
     payload: Optional[ChangeUpdateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> ChangeReportResponse:
     """
@@ -850,6 +927,7 @@ async def update_project_documentation(
     return await project_service.update_documentation_and_sync(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         force_all=force,
         document_types=doc_types,
         regenerate_diagrams=regen_diagrams,
@@ -863,6 +941,7 @@ async def update_project_documentation(
 @router.get("/{project_id}/github/status", response_model=GitHubStatusResponse)
 async def get_project_github_status(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> GitHubStatusResponse:
     """
@@ -872,6 +951,7 @@ async def get_project_github_status(
     return await project_service.get_github_status(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -879,6 +959,7 @@ async def get_project_github_status(
 async def refresh_project_github(
     project_id: str,
     payload: Optional[GitHubRefreshRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> GitHubRefreshResponse:
     """
@@ -890,6 +971,7 @@ async def refresh_project_github(
     return await project_service.refresh_github_repo(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
         branch=branch,
         force_sync=force_sync,
     )
@@ -903,6 +985,7 @@ async def refresh_project_github(
 async def generate_project_technical_report(
     project_id: str,
     payload: Optional[ReportGenerateRequest] = None,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> TechnicalReportResponse:
     """
@@ -915,18 +998,21 @@ async def generate_project_technical_report(
         project_id=project_id,
         payload=req,
         db=db,
+        user_id=current_user.id,
     )
 
 
 @router.get("/{project_id}/reports", response_model=List[TechnicalReportResponse])
 async def list_project_technical_reports(
     project_id: str,
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ) -> List[TechnicalReportResponse]:
     """Retrieve all generated technical reports and documentation snapshots for a project."""
     return await project_service.list_project_reports(
         project_id=project_id,
         db=db,
+        user_id=current_user.id,
     )
 
 
@@ -935,6 +1021,7 @@ async def export_project_technical_report(
     project_id: str,
     report_id: str,
     format: str = Query("markdown", description="Export format: markdown, html, pdf"),
+    current_user: User = Depends(get_current_user_or_default),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -946,6 +1033,7 @@ async def export_project_technical_report(
         report_id=report_id,
         format_type=format,
         db=db,
+        user_id=current_user.id,
     )
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
