@@ -38,6 +38,7 @@ import {
   Workflow,
   Network,
   Database,
+  Compass,
 } from 'lucide-react';
 import {
   Project,
