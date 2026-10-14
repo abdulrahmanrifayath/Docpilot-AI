@@ -310,6 +310,7 @@ export interface ProjectCreatePayload {
   description?: string;
   source_type: 'zip' | 'git' | 'local';
   source_url?: string;
+  branch?: string;
 }
 
 export interface ProjectFileNode {

@@ -20,16 +20,26 @@ import {
   Clock,
   Workflow,
   BookOpen,
+  GitBranch,
+  ExternalLink,
+  FolderGit2,
+  Globe,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import {
   Project,
   ChangeCheckResponse,
   ChangeReportResponse,
+  GitHubStatusResponse,
+  GitHubRefreshResponse,
 } from '../types';
 import {
   checkProjectChanges,
   updateProjectDocumentation,
   fetchProjectChanges,
+  fetchGitHubStatus,
+  refreshGitHubRepo,
 } from '../api/client';
 
 interface SyncManagerProps {
@@ -47,11 +57,62 @@ export const SyncManager: React.FC<SyncManagerProps> = ({ project, onSyncComplet
   const [showFilesList, setShowFilesList] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Phase 15: GitHub Integration State
+  const isGitProject = project.source_type === 'git' || (project.source_url && project.source_url.includes('github.com'));
+  const [githubStatus, setGithubStatus] = useState<GitHubStatusResponse | null>(null);
+  const [loadingGithub, setLoadingGithub] = useState<boolean>(false);
+  const [refreshingGithub, setRefreshingGithub] = useState<boolean>(false);
+  const [selectedBranch, setSelectedBranch] = useState<string>(project.branch || 'main');
+  const [forceSyncRemote, setForceSyncRemote] = useState<boolean>(false);
+  const [githubSuccessMsg, setGithubSuccessMsg] = useState<string | null>(null);
+  const [githubErrorMsg, setGithubErrorMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (project?.id) {
       loadHistory(project.id);
+      if (isGitProject) {
+        loadGithubStatus(project.id);
+      }
     }
-  }, [project?.id]);
+  }, [project?.id, isGitProject]);
+
+  const loadGithubStatus = async (projectId: string) => {
+    setLoadingGithub(true);
+    setGithubErrorMsg(null);
+    try {
+      const status = await fetchGitHubStatus(projectId);
+      setGithubStatus(status);
+      if (status.current_branch) {
+        setSelectedBranch(status.current_branch);
+      }
+    } catch (err: any) {
+      setGithubErrorMsg(err.message || 'Failed to check GitHub status');
+    } finally {
+      setLoadingGithub(false);
+    }
+  };
+
+  const handleRefreshGitHub = async () => {
+    setRefreshingGithub(true);
+    setGithubErrorMsg(null);
+    setGithubSuccessMsg(null);
+    try {
+      const res = await refreshGitHubRepo(project.id, {
+        branch: selectedBranch,
+        force_sync: forceSyncRemote,
+      });
+      setGithubSuccessMsg(res.message);
+      await loadGithubStatus(project.id);
+      await loadHistory(project.id);
+      if (onSyncComplete) {
+        onSyncComplete();
+      }
+    } catch (err: any) {
+      setGithubErrorMsg(err.message || 'Failed to refresh repository from GitHub');
+    } finally {
+      setRefreshingGithub(false);
+    }
+  };
 
   const loadHistory = async (projectId: string) => {
     try {
@@ -220,6 +281,185 @@ export const SyncManager: React.FC<SyncManagerProps> = ({ project, onSyncComplet
           </button>
         </div>
       </div>
+
+      {/* PHASE 15: GITHUB INTEGRATION & REMOTE COMMIT TRACKING CARD */}
+      {isGitProject && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-brand-500/30 shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                <FolderGit2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+                    <span>GitHub Remote Integration</span>
+                  </h3>
+                  {githubStatus?.is_github_repo ? (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        githubStatus.status === 'BEHIND'
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/40 animate-pulse'
+                          : githubStatus.status === 'UP_TO_DATE'
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      {githubStatus.status === 'BEHIND' && <AlertTriangle className="w-3 h-3 text-amber-400" />}
+                      {githubStatus.status === 'UP_TO_DATE' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                      <span>
+                        {githubStatus.status === 'BEHIND'
+                          ? `${githubStatus.commits_behind} Commit(s) Behind Remote`
+                          : githubStatus.status === 'UP_TO_DATE'
+                          ? 'Synchronized with Origin'
+                          : githubStatus.status}
+                      </span>
+                    </span>
+                  ) : null}
+                </div>
+                {githubStatus?.repository_url && (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <a
+                      href={githubStatus.repository_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+                    >
+                      <span>
+                        {githubStatus.owner}/{githubStatus.repo_name}
+                      </span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadGithubStatus(project.id)}
+                disabled={loadingGithub || refreshingGithub}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all disabled:opacity-50"
+                title="Query GitHub API / remote origin for new commits"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingGithub ? 'animate-spin' : ''}`} />
+                <span>{loadingGithub ? 'Checking...' : 'Check Remote'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRefreshGitHub}
+                disabled={refreshingGithub || loadingGithub}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 transition-all disabled:opacity-50"
+                title="Pull latest remote commits and automatically synchronize documentation"
+              >
+                {refreshingGithub ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <GitBranch className="w-3.5 h-3.5" />
+                )}
+                <span>{refreshingGithub ? 'Pulling & Syncing...' : 'Pull & Refresh'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* GitHub Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            {/* Branch selector / active branch */}
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider flex items-center gap-1">
+                <GitBranch className="w-3 h-3 text-brand-400" />
+                <span>Tracking Branch</span>
+              </span>
+              {githubStatus?.available_branches && githubStatus.available_branches.length > 1 ? (
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  disabled={refreshingGithub}
+                  className="w-full mt-0.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
+                >
+                  {githubStatus.available_branches.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="font-mono font-bold text-slate-200">
+                  {selectedBranch || project.branch || 'main'}
+                </p>
+              )}
+            </div>
+
+            {/* Local Commit SHA */}
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Local Commit</span>
+              <p className="font-mono font-bold text-slate-200">
+                {githubStatus?.local_commit_sha ? githubStatus.local_commit_sha.slice(0, 8) : commitShaDisplay}
+              </p>
+            </div>
+
+            {/* Remote Commit SHA */}
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Remote Origin Commit</span>
+              <div className="flex items-center justify-between">
+                <p className="font-mono font-bold text-brand-300">
+                  {githubStatus?.remote_commit_sha ? githubStatus.remote_commit_sha.slice(0, 8) : 'Pending Check'}
+                </p>
+                {githubStatus?.local_commit_sha && githubStatus?.remote_commit_sha && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded text-[10px] font-semibold font-mono ${
+                      githubStatus.local_commit_sha === githubStatus.remote_commit_sha
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    }`}
+                  >
+                    {githubStatus.local_commit_sha === githubStatus.remote_commit_sha ? 'MATCH' : 'DIFF'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Force Sync Option */}
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="force-sync-checkbox"
+              checked={forceSyncRemote}
+              onChange={(e) => setForceSyncRemote(e.target.checked)}
+              className="rounded bg-slate-900 border-slate-700 text-brand-500 focus:ring-0"
+            />
+            <label htmlFor="force-sync-checkbox" className="text-[11px] text-slate-400 cursor-pointer">
+              Force regeneration of all documentation and diagrams even if commit hash has not changed
+            </label>
+          </div>
+
+          {/* GitHub Success Notification */}
+          {githubSuccessMsg && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white mb-0.5">Refresh Complete</p>
+                <p className="text-emerald-200/90">{githubSuccessMsg}</p>
+              </div>
+            </div>
+          )}
+
+          {/* GitHub Error Notification */}
+          {githubErrorMsg && (
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white mb-0.5">GitHub Integration Notice</p>
+                <p className="text-rose-200/90">{githubErrorMsg}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Error Message Banner */}
       {errorMsg && (

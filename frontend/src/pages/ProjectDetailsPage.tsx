@@ -486,7 +486,7 @@ export const ProjectDetailsPage: React.FC = () => {
     if (!project) return;
     setIsUploading(true);
     try {
-      await cloneProjectGit(project.id, project.source_url);
+      await cloneProjectGit(project.id, project.source_url, project.branch);
       await loadAllData(project.id);
       await refreshProjects();
     } catch (err: any) {
@@ -564,6 +564,25 @@ export const ProjectDetailsPage: React.FC = () => {
                 {isFailed && <AlertCircle className="w-3 h-3" />}
                 <span>{project.status}</span>
               </span>
+              {project.source_type === 'git' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20 font-mono">
+                    <GitBranch className="w-3 h-3" />
+                    <span>{project.branch || 'main'}</span>
+                  </span>
+                  {project.source_url && (
+                    <a
+                      href={project.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                      title="Open on GitHub"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
             {project.description && (
               <p className="text-xs text-slate-400 mt-0.5">{project.description}</p>
