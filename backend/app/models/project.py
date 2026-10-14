@@ -62,6 +62,7 @@ class Project(Base):
     knowledge_nodes = relationship("KnowledgeNode", back_populates="project", cascade="all, delete-orphan")
     knowledge_edges = relationship("KnowledgeEdge", back_populates="project", cascade="all, delete-orphan")
     sequence_diagrams = relationship("SequenceDiagram", back_populates="project", cascade="all, delete-orphan")
+    onboarding_guide = relationship("OnboardingGuide", back_populates="project", uselist=False, cascade="all, delete-orphan")
 
     # Convenient synonyms
     entities = synonym("code_entities")
@@ -332,6 +333,25 @@ class ChatMessage(Base):
 
     project = relationship("Project", back_populates="chat_messages")
     repository = synonym("project")
+
+
+class OnboardingGuide(Base):
+    __tablename__ = "onboarding_guides"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    title = Column(String(255), nullable=False, default="Developer Onboarding Guide")
+    markdown_content = Column(Text, nullable=False)
+    sections = Column(JSON, default=list)
+    detected_tools = Column(JSON, default=list)
+    missing_sections = Column(JSON, default=list)
+    version = Column(Integer, default=1, nullable=False)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    project = relationship("Project", back_populates="onboarding_guide")
 
 
 # Backward compatibility aliases
