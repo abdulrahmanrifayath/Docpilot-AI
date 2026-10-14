@@ -71,10 +71,12 @@ from app.schemas.project import (
     SequenceGenerateResponse,
     ChatMessageResponse,
     ChatHistoryClearResponse,
+    OnboardingGuideResponse,
 )
 from app.services.documentation_service import documentation_service
 from app.services.diagram_service import diagram_service
 from app.services.sequence_service import sequence_service
+from app.services.onboarding_service import onboarding_service
 from app.services.repository_scanner import repository_scanner
 from app.ai.chat_service import chat_service
 
