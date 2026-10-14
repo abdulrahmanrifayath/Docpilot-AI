@@ -48,6 +48,10 @@ async def init_db() -> None:
                 existing_cols = {row[1] for row in res.fetchall()}
                 if "infrastructure" not in existing_cols and "id" in existing_cols:
                     await conn.execute(text("ALTER TABLE projects ADD COLUMN infrastructure JSON DEFAULT '[]'"))
+                if "last_commit_sha" not in existing_cols and "id" in existing_cols:
+                    await conn.execute(text("ALTER TABLE projects ADD COLUMN last_commit_sha VARCHAR(100)"))
+                if "sync_status" not in existing_cols and "id" in existing_cols:
+                    await conn.execute(text("ALTER TABLE projects ADD COLUMN sync_status VARCHAR(50) DEFAULT 'SYNCED'"))
 
                 # Documents table Phase 9 columns migration
                 d_res = await conn.execute(text("PRAGMA table_info(documents)"))
