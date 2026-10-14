@@ -34,6 +34,8 @@ class ProjectResponse(BaseModel):
     status: str
     error_message: Optional[str] = None
     last_analyzed_at: Optional[datetime] = None
+    last_commit_sha: Optional[str] = None
+    sync_status: Optional[str] = "SYNCED"
     languages: Dict[str, Any] = Field(default_factory=dict)
     frameworks: List[str] = Field(default_factory=list)
     infrastructure: List[str] = Field(default_factory=list)
