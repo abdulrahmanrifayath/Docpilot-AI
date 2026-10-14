@@ -53,7 +53,9 @@ class ProjectIndexerService:
 
         # 1. Index Project Overview & Metadata Chunk
         languages_summary = ", ".join(project.languages.keys()) if project.languages else "Various"
-        frameworks_summary = ", ".join(project.frameworks) if project.frameworks else "None detected"
+        raw_frameworks = project.frameworks or []
+        frameworks_list = [f if isinstance(f, str) else str(f.get("name", f)) for f in raw_frameworks]
+        frameworks_summary = ", ".join(frameworks_list) if frameworks_list else "None detected"
         overview_content = (
             f"Project: {project.name}. Description: {project.description or 'No description'}. "
             f"Languages: {languages_summary}. Frameworks: {frameworks_summary}. "
@@ -87,8 +89,10 @@ class ProjectIndexerService:
             meta = cls.metadata_json or {}
             methods = meta.get("methods", [])
             fields = meta.get("fields", [])
-            methods_str = ", ".join(methods[:8]) if methods else "None"
-            fields_str = ", ".join(fields[:8]) if fields else "None"
+            methods_list = [m if isinstance(m, str) else str(m.get("name", m)) for m in (methods or [])]
+            fields_list = [f if isinstance(f, str) else str(f.get("name", f)) for f in (fields or [])]
+            methods_str = ", ".join(methods_list[:8]) if methods_list else "None"
+            fields_str = ", ".join(fields_list[:8]) if fields_list else "None"
             docstr = meta.get("docstring", "")
 
             content = (
@@ -110,7 +114,7 @@ class ProjectIndexerService:
                     content=content,
                     entity_id=cls.id,
                     entity_type="CLASS",
-                    metadata={"class_name": cls.name, "methods": methods},
+                    metadata={"class_name": cls.name, "methods": methods_list},
                     vector=vec,
                 )
             )
@@ -128,8 +132,10 @@ class ProjectIndexerService:
             params = meta.get("parameters", [])
             calls = meta.get("calls", [])
             docstr = meta.get("docstring", "")
-            params_str = ", ".join(params[:6]) if params else "None"
-            calls_str = ", ".join(calls[:6]) if calls else "None"
+            params_list = [p if isinstance(p, str) else str(p.get("name", p)) for p in (params or [])]
+            calls_list = [c if isinstance(c, str) else str(c.get("name", c)) for c in (calls or [])]
+            params_str = ", ".join(params_list[:6]) if params_list else "None"
+            calls_str = ", ".join(calls_list[:6]) if calls_list else "None"
 
             content = (
                 f"Function {fn.name}({params_str}) in {fn.file_path} (lines {fn.start_line}-{fn.end_line}). "
@@ -198,14 +204,16 @@ class ProjectIndexerService:
         db_res = await db.execute(select(DatabaseModel).where(DatabaseModel.project_id == project_id))
         db_models = db_res.scalars().all()
         for model in db_models:
-            fields_meta = model.fields_json or []
-            field_names = [f.get("name", "") for f in fields_meta if isinstance(f, dict)]
-            pks = [f.get("name", "") for f in fields_meta if isinstance(f, dict) and f.get("primary_key")]
-            fks = [f.get("name", "") for f in fields_meta if isinstance(f, dict) and f.get("foreign_key")]
+            fields_list = getattr(model, "fields", []) or []
+            field_names = [f.name for f in fields_list if hasattr(f, "name")]
+            if not field_names and model.metadata_json:
+                field_names = [f.get("name", str(f)) if isinstance(f, dict) else str(f) for f in model.metadata_json.get("fields", [])]
+            pks = [f.name for f in fields_list if getattr(f, "is_primary_key", False)]
+            fks = [f.name for f in fields_list if getattr(f, "is_foreign_key", False)]
 
             content = (
-                f"Database Model: {model.model_name} (table: '{model.table_name}') in file {model.file_path}. "
-                f"ORM framework: {model.orm_framework or 'SQLAlchemy'}. "
+                f"Database Model: {model.name} (table: '{model.table_name}') in file {model.file_path}. "
+                f"ORM framework: {model.orm_type or 'SQLAlchemy'}. "
                 f"Primary Keys: {', '.join(pks)}. Foreign Keys: {', '.join(fks)}. "
                 f"Columns & Fields: {', '.join(field_names[:12])}."
             )
@@ -215,7 +223,7 @@ class ProjectIndexerService:
                     id=f"db_{model.id}",
                     project_id=project_id,
                     chunk_type="model",
-                    title=f"Database Model {model.model_name} ({model.table_name})",
+                    title=f"Database Model {model.name} ({model.table_name})",
                     file_path=model.file_path,
                     start_line=1,
                     end_line=30,
@@ -223,7 +231,7 @@ class ProjectIndexerService:
                     entity_id=model.id,
                     entity_type="DATABASE_MODEL",
                     metadata={
-                        "model_name": model.model_name,
+                        "model_name": model.name,
                         "table_name": model.table_name,
                         "fields": field_names,
                     },
@@ -265,12 +273,13 @@ class ProjectIndexerService:
         for seq in sequences:
             steps_meta = seq.steps or []
             steps_desc = "; ".join(
-                [f"{s.get('source')} -> {s.get('target')}: {s.get('action')}" for s in steps_meta[:6]]
+                [f"{s.get('source')} -> {s.get('target')}: {s.get('action')}" for s in steps_meta[:6] if isinstance(s, dict)]
             )
+            inv_comps = [c if isinstance(c, str) else str(c.get("name", c)) for c in (seq.involved_components or [])]
             content = (
                 f"Sequence Flow: {seq.name} (category: {seq.flow_category}). "
                 f"Trigger endpoint: {seq.trigger_method} {seq.trigger_endpoint}. "
-                f"Involved components: {', '.join(seq.involved_components or [])}. "
+                f"Involved components: {', '.join(inv_comps)}. "
                 f"Steps: {steps_desc}."
             )
             vec = await embedding_service.get_embedding(content)

@@ -33,6 +33,7 @@ import {
   DiagramGeneratePayload,
   DiagramGenerateResponse,
   ChatMessage,
+  ChatHistoryClearResponse,
   ProviderSettings,
   SequenceDiagramItem,
   SequenceGeneratePayload,
@@ -649,3 +650,53 @@ export async function triggerAnalysis(id: string): Promise<any> {
   return fetchProject(id);
 }
 
+// ============================================================================
+// Phase 12: Repository-Aware AI Assistant
+// ============================================================================
+
+export async function sendChatMessage(
+  projectId: string,
+  content: string
+): Promise<ChatMessage> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const err: any = new Error(
+      errorData.detail?.message ||
+        errorData.error?.message ||
+        errorData.detail ||
+        'Failed to send chat message'
+    );
+    err.status = res.status;
+    err.data = errorData.detail || errorData.error || errorData;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function fetchChatHistory(projectId: string): Promise<ChatMessage[]> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/chat/history`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function clearChatHistory(
+  projectId: string
+): Promise<ChatHistoryClearResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/chat/history`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail?.message ||
+        errorData.detail ||
+        'Failed to clear chat history'
+    );
+  }
+  return res.json();
+}

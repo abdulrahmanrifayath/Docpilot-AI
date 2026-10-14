@@ -26,33 +26,33 @@ class IntentDetector:
 
     PATTERNS: Dict[str, List[str]] = {
         "AUTHENTICATION": [
-            r"\bauth\b", r"\blogin\b", r"\bregister\b", r"\bsignup\b", r"\bjwt\b",
-            r"\btoken\b", r"\bpassword\b", r"\bcredential", r"\boauth\b", r"\bsession\b",
-            r"\bbearer\b", r"\bauthenticate\b",
+            r"\bauth\w*", r"\blogin\w*", r"\bregister\w*", r"\bsignup\w*", r"\bsign[- ]in\b",
+            r"\bjwt\b", r"\btoken\w*", r"\bpassword\w*", r"\bcredential\w*", r"\boauth\w*",
+            r"\bsession\w*", r"\bbearer\b",
         ],
         "ARCHITECTURE": [
-            r"\barchitecture\b", r"\boverview\b", r"\bstructure\b", r"\btech stack\b",
-            r"\bframeworks?\b", r"\blayers?\b", r"\bhigh[- ]level\b", r"\bcomponents?\b",
+            r"\barchitect\w*", r"\boverview\b", r"\bstructure\b", r"\btech[- ]stack\b",
+            r"\bframework\w*", r"\blayer\w*", r"\bhigh[- ]level\b", r"\bcomponent\w*",
             r"\bdesign\b", r"\bsystem\b",
         ],
         "API_USAGE": [
-            r"\bwhich apis?\b", r"\bapis? use\b", r"\bendpoint\b", r"\broutes?\b",
-            r"\bhandlers?\b", r"\bcontrollers?\b", r"\bhttp\b", r"\brest\b",
-            r"\bapi\b", r"\brequest\b", r"\bresponse\b",
+            r"\bwhich apis?\b", r"\bapis? use\b", r"\bendpoint\w*", r"\broute\w*",
+            r"\bhandler\w*", r"\bcontroller\w*", r"\bhttp\b", r"\brest\b",
+            r"\bapi\b", r"\brequest\w*", r"\bresponse\w*",
         ],
         "DATABASE": [
-            r"\bdatabase\b", r"\bdb\b", r"\bmodels?\b", r"\bschemas?\b",
-            r"\btables?\b", r"\bcolumns?\b", r"\bforeign keys?\b", r"\brelationships?\b",
+            r"\bdatabas\w*", r"\bdb\b", r"\bmodel\w*", r"\bschema\w*",
+            r"\btable\w*", r"\bcolumn\w*", r"\bforeign key\w*", r"\brelationship\w*",
             r"\borm\b", r"\bsql\b", r"\bentity\b", r"\bentities\b",
         ],
         "FLOW_TRACE": [
-            r"\bwhat happens when\b", r"\bhow does .* work\b", r"\bflow\b",
-            r"\bprocess(ing)?\b", r"\border of\b", r"\bsequence\b", r"\blifecycle\b",
+            r"\bwhat happens when\b", r"\bhow does .* work\b", r"\bflow\w*",
+            r"\bprocess\w*", r"\border of\b", r"\bsequence\w*", r"\blifecycle\b",
             r"\bstep by step\b", r"\btrace\b", r"\bcheckout\b", r"\bexecution\b",
         ],
         "CODE_SEARCH": [
-            r"\bwhere is\b", r"\bwhere are\b", r"\bimplemented\b", r"\bdefined\b",
-            r"\blocation\b", r"\bwhich file\b", r"\bfind\b", r"\bsource code\b",
+            r"\bwhere is\b", r"\bwhere are\b", r"\bimplemented\b", r"\bimplement\w*",
+            r"\bdefined\b", r"\blocation\b", r"\bwhich file\b", r"\bfind\b", r"\bsource code\b",
         ],
     }
 
@@ -199,12 +199,12 @@ class ChatService:
             model_res = await db.execute(model_stmt)
             all_models = model_res.scalars().all()
             for m in all_models:
-                m_text = f"{m.model_name} {m.table_name}".lower()
+                m_text = f"{m.name} {m.table_name}".lower()
                 if any(t.lower() in m_text for t in target_terms) or \
                    (intent == "DATABASE") or \
                    (intent == "AUTHENTICATION" and "user" in m_text):
                     matched_models.append(m)
-                    relevant_components.add(f"Model: {m.model_name} ({m.table_name})")
+                    relevant_components.add(f"Model: {m.name} ({m.table_name})")
 
             # Query Sequence Diagrams matching intent or terms
             seq_stmt = select(SequenceDiagram).where(SequenceDiagram.project_id == pid)
@@ -257,12 +257,40 @@ class ChatService:
                     rel_desc = f"{edge.source_name} --({edge.relationship_type})--> {edge.target_name}"
                     graph_relationships.append(rel_desc)
 
-        # Step 5: Build Citations List
+        # Step 5: Build Citations List with grounded term relevance filtering
         citations: List[Dict[str, Any]] = []
         seen_citations: Set[str] = set()
 
-        # From vector chunks
+        stop_words = {
+            "where", "is", "are", "the", "a", "an", "and", "or", "in", "on", "at", "to",
+            "for", "of", "with", "by", "what", "how", "does", "do", "did", "can", "could",
+            "would", "which", "when", "why", "implemented", "work", "works", "working",
+            "explain", "project", "code", "repo", "repository", "system", "file", "files",
+            "about", "show", "tell", "me", "used", "uses", "using", "defined", "find",
+            "handler", "handlers", "service", "services", "function", "functions", "method", "methods",
+            "class", "classes", "endpoint", "endpoints", "api", "apis", "route", "routes",
+            "model", "models", "component", "components", "implementation", "implementations",
+        }
+        unique_terms = list(set([w.lower() for w in re.findall(r"\b[a-zA-Z0-9_]{3,}\b", query) if w.lower() not in stop_words]))
+        min_required = 2 if len(unique_terms) >= 3 else (1 if unique_terms else 0)
+
+        valid_vector_results: List[SearchResult] = []
         for res in search_results:
+            chunk = res.chunk
+            # Strip template structural labels so query words like 'signature' or 'docstring' don't falsely match
+            clean_content = re.sub(r"\b(Signature|Docstring|Methods|Fields|Columns|Parameters|Parent|Security):", "", chunk.content, flags=re.IGNORECASE)
+            chunk_text = f"{chunk.title} {chunk.file_path} {clean_content}".lower()
+            matched_count = sum(1 for t in unique_terms if t in chunk_text)
+            term_match = matched_count >= min_required if unique_terms else True
+            # For architecture queries, allow general overview chunks; for specific questions, require term match or high similarity
+            if intent in ("ARCHITECTURE", "GENERAL_QA"):
+                if term_match or chunk.chunk_type in ("file", "class") or res.score >= 0.35:
+                    valid_vector_results.append(res)
+            elif term_match:
+                valid_vector_results.append(res)
+
+        # From filtered vector chunks
+        for res in valid_vector_results:
             chunk = res.chunk
             cite_key = f"{chunk.file_path}:{chunk.start_line}"
             if cite_key not in seen_citations:
@@ -299,7 +327,7 @@ class ChatService:
                 citations.append({
                     "file": m.file_path,
                     "lines": "1-40",
-                    "title": f"Model: {m.model_name}",
+                    "title": f"Model: {m.name}",
                     "type": "model",
                     "relevance": 0.92,
                 })
@@ -321,17 +349,17 @@ class ChatService:
         clean_components = sorted(list(relevant_components))[:8]
 
         # Step 6: Negative Constraint Check & Confidence Evaluation
-        # If no citations, or vector scores are exceedingly low and no DB entities matched
-        max_score = max([r.score for r in search_results], default=0.0)
+        # If no citations or no direct DB entities matched
+        max_score = max([r.score for r in valid_vector_results], default=0.0)
         has_direct_evidence = (
             len(matched_apis) > 0 or
             len(matched_models) > 0 or
             len(matched_entities) > 0 or
             len(matched_sequences) > 0 or
-            (len(search_results) > 0 and max_score >= 0.28)
+            (len(valid_vector_results) > 0 and max_score >= 0.28)
         )
 
-        if not has_direct_evidence and len(citations) == 0:
+        if not has_direct_evidence or len(citations) == 0:
             confidence = "Low Confidence (No matching components found)"
             answer = (
                 f"### Repository Analysis: Insufficient Evidence\n\n"
@@ -359,7 +387,7 @@ class ChatService:
             context_sections.append("#### Detected APIs:\n" + "\n".join(api_lines))
 
         if matched_models:
-            model_lines = [f"- `{m.model_name}` (table: `{m.table_name}`) in `{m.file_path}`" for m in matched_models[:5]]
+            model_lines = [f"- `{m.name}` (table: `{m.table_name}`) in `{m.file_path}`" for m in matched_models[:5]]
             context_sections.append("#### Database Models:\n" + "\n".join(model_lines))
 
         if matched_sequences:
@@ -369,9 +397,9 @@ class ChatService:
         if graph_relationships:
             context_sections.append("#### Knowledge Graph Relationships:\n" + "\n".join([f"- {r}" for r in graph_relationships[:6]]))
 
-        if search_results:
+        if valid_vector_results:
             chunk_snippets = []
-            for r in search_results[:5]:
+            for r in valid_vector_results[:5]:
                 chunk_snippets.append(
                     f"**[{r.chunk.chunk_type.upper()}] {r.chunk.title}** (`{r.chunk.file_path}:{r.chunk.start_line}`):\n"
                     f"```\n{r.chunk.content[:450]}\n```"
@@ -416,7 +444,7 @@ class ChatService:
             matched_models=matched_models,
             matched_sequences=matched_sequences,
             graph_relationships=graph_relationships,
-            search_results=search_results,
+            search_results=valid_vector_results,
             confidence=confidence,
         )
 
@@ -449,7 +477,7 @@ class ChatService:
             for a in matched_apis:
                 lines.append(f"- **Endpoint**: `{a.method} {a.path}` (handler: `{a.handler_name}` in `{a.file_path}`)")
             if matched_models:
-                lines.append(f"- **User Model**: `{matched_models[0].model_name}` in `{matched_models[0].file_path}` (table `{matched_models[0].table_name}`)")
+                lines.append(f"- **User Model**: `{matched_models[0].name}` in `{matched_models[0].file_path}` (table `{matched_models[0].table_name}`)")
             if matched_sequences:
                 lines.append(f"- **Inferred Flow**: {matched_sequences[0].name} (Category: `{matched_sequences[0].flow_category}`)")
 
@@ -459,7 +487,7 @@ class ChatService:
             if matched_apis:
                 lines.append(f"- **API Layer**: {len(matched_apis)} exposed endpoints managing request handling and validation.")
             if matched_models:
-                lines.append(f"- **Persistence Layer**: Models like `{', '.join([m.model_name for m in matched_models[:4]])}` mapping relational schemas.")
+                lines.append(f"- **Persistence Layer**: Models like `{', '.join([m.name for m in matched_models[:4]])}` mapping relational schemas.")
             if graph_relationships:
                 lines.append("- **Component Dependencies**:")
                 for r in graph_relationships[:4]:
@@ -470,8 +498,8 @@ class ChatService:
             if matched_apis:
                 lines.append(f"Found **{len(matched_apis)}** matching API endpoints:")
                 for a in matched_apis:
-                    auth_label = "🔒 Authenticated" if a.authentication_required else "🌐 Public"
-                    lines.append(f"- `{a.method} {a.path}` [{auth_label}]")
+                    auth_label = "[Authenticated]" if a.authentication_required else "[Public]"
+                    lines.append(f"- `{a.method} {a.path}` {auth_label}")
                     lines.append(f"  - Handler: `{a.handler_name}` in `{a.file_path}`")
                     if a.tags:
                         lines.append(f"  - Tags: {', '.join(a.tags)}")
@@ -483,8 +511,8 @@ class ChatService:
             if matched_models:
                 lines.append(f"Found **{len(matched_models)}** database model definitions:")
                 for m in matched_models:
-                    fields = [f.get("name", "") for f in (m.fields_json or []) if isinstance(f, dict)]
-                    lines.append(f"- **Model `{m.model_name}`** (Table: `{m.table_name}`) in `{m.file_path}`")
+                    fields = [f.name for f in getattr(m, "fields", []) or [] if hasattr(f, "name")]
+                    lines.append(f"- **Model `{m.name}`** (Table: `{m.table_name}`) in `{m.file_path}`")
                     if fields:
                         lines.append(f"  - Fields: `{', '.join(fields[:8])}`")
             else:
@@ -496,14 +524,15 @@ class ChatService:
                 seq = matched_sequences[0]
                 lines.append(f"**Flow**: {seq.name}")
                 lines.append(f"- **Trigger Route**: `{seq.trigger_method} {seq.trigger_endpoint}`")
-                lines.append(f"- **Involved Participants**: {', '.join(seq.involved_components or [])}")
+                inv = [c if isinstance(c, str) else str(c.get("name", c)) for c in (seq.involved_components or [])]
+                lines.append(f"- **Involved Participants**: {', '.join(inv)}")
                 lines.append("\n**Step-by-Step Execution Sequence**:")
                 for s in (seq.steps or [])[:6]:
-                    lines.append(f"  {s.get('step_number')}. `{s.get('source')}` ➔ `{s.get('target')}`: {s.get('action')}")
+                    lines.append(f"  {s.get('step_number')}. `{s.get('source')}` -> `{s.get('target')}`: {s.get('action')}")
             else:
                 lines.append(f"Probable execution sequence traced across {len(matched_apis)} endpoints and related services:")
                 for a in matched_apis[:3]:
-                    lines.append(f"- User request ➔ `{a.method} {a.path}` ➔ `{a.handler_name}`")
+                    lines.append(f"- User request -> `{a.method} {a.path}` -> `{a.handler_name}`")
 
         else:
             lines.append(f"### Analysis for: *\"{query}\"*\n")
@@ -511,21 +540,21 @@ class ChatService:
 
         # Verified Components Section
         if components:
-            lines.append("\n#### 🧩 Verified Components")
+            lines.append("\n#### Verified Components")
             for c in components:
                 lines.append(f"- `{c}`")
 
         # Code Excerpts
         if search_results:
-            lines.append("\n#### 📄 Verified Source Code References")
+            lines.append("\n#### Verified Source Code References")
             for r in search_results[:3]:
                 c = r.chunk
-                lines.append(f"- **`{c.file_path}:{c.start_line}`** — *{c.title}*")
+                lines.append(f"- **`{c.file_path}:{c.start_line}`** - *{c.title}*")
                 lines.append(f"```\n{c.content[:280]}{'...' if len(c.content) > 280 else ''}\n```")
 
         # Graph Relationships
         if graph_relationships:
-            lines.append("\n#### 🔗 Discovered Architecture Graph Edges")
+            lines.append("\n#### Discovered Architecture Graph Edges")
             for rel in graph_relationships[:4]:
                 lines.append(f"- `{rel}`")
 

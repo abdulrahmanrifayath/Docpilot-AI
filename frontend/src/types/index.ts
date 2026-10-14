@@ -644,5 +644,38 @@ export interface SequenceGenerateResponse {
   message?: string;
 }
 
+// ============================================================================
+// Phase 12: Repository-Aware AI Assistant Types
+// ============================================================================
+
+export interface ChatCitation {
+  file: string;
+  lines: string;
+  title: string;
+  type: 'file' | 'class' | 'function' | 'api' | 'model' | 'doc' | 'sequence' | 'code' | string;
+  relevance?: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  project_id?: string;
+  repository_id?: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  sources?: ChatCitation[];
+  confidence?: string | null;
+  intent?: string | null;
+  relevant_components?: string[];
+  metadata_json?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface ChatHistoryClearResponse {
+  status: string;
+  project_id: string;
+  deleted_count: number;
+  message: string;
+}
+
 
 
