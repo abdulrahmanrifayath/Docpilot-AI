@@ -78,6 +78,8 @@ from app.schemas.project import (
     GitHubValidateResponse,
     GitHubStatusResponse,
     GitHubRefreshResponse,
+    ReportGenerateRequest,
+    TechnicalReportResponse,
 )
 from app.services.documentation_service import documentation_service
 from app.services.diagram_service import diagram_service
@@ -85,6 +87,7 @@ from app.services.sequence_service import sequence_service
 from app.services.onboarding_service import onboarding_service
 from app.services.sync_service import sync_service
 from app.services.github_service import github_service
+from app.services.report_service import report_service
 from app.services.repository_scanner import repository_scanner
 from app.ai.chat_service import chat_service
 
@@ -1735,6 +1738,39 @@ class ProjectService:
             db=db,
             branch=branch,
             force_sync=force_sync,
+        )
+
+    # -------------------------------------------------------------------------
+    # PHASE 16: TECHNICAL REPORTS AND DOCUMENTATION EXPORT
+    # -------------------------------------------------------------------------
+
+    async def generate_project_report(
+        self,
+        project_id: str,
+        payload: ReportGenerateRequest,
+        db: AsyncSession,
+    ) -> TechnicalReportResponse:
+        return await report_service.generate_report(project_id=project_id, payload=payload, db=db)
+
+    async def list_project_reports(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> List[TechnicalReportResponse]:
+        return await report_service.list_reports(project_id=project_id, db=db)
+
+    async def export_project_report(
+        self,
+        project_id: str,
+        report_id: str,
+        format_type: str,
+        db: AsyncSession,
+    ) -> Tuple[bytes, str, str]:
+        return await report_service.export_report(
+            project_id=project_id,
+            report_id=report_id,
+            format_type=format_type,
+            db=db,
         )
 
 

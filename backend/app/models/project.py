@@ -67,6 +67,7 @@ class Project(Base):
     sequence_diagrams = relationship("SequenceDiagram", back_populates="project", cascade="all, delete-orphan")
     onboarding_guide = relationship("OnboardingGuide", back_populates="project", uselist=False, cascade="all, delete-orphan")
     change_records = relationship("ChangeRecord", back_populates="project", cascade="all, delete-orphan", order_by="desc(ChangeRecord.created_at)")
+    reports = relationship("TechnicalReport", back_populates="project", cascade="all, delete-orphan", order_by="desc(TechnicalReport.created_at)")
 
     # Convenient synonyms
     entities = synonym("code_entities")
@@ -402,6 +403,27 @@ class ChangeRecord(Base):
     created_at = Column(DateTime, default=utc_now)
 
     project = relationship("Project", back_populates="change_records")
+
+
+class TechnicalReport(Base):
+    __tablename__ = "technical_reports"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    report_type = Column(String(50), nullable=False, default="FULL_TECHNICAL_REPORT", index=True)  # FULL_TECHNICAL_REPORT, README, API_DOCUMENTATION, ARCHITECTURE, DATABASE, ONBOARDING
+    title = Column(String(255), nullable=False)
+    description = Column(String(500), nullable=True)
+    markdown_content = Column(Text, nullable=False)
+    html_content = Column(Text, nullable=True)
+    sections = Column(JSON, default=list)
+    commit_sha = Column(String(100), nullable=True)
+    format_metadata = Column("metadata", JSON, default=dict)
+    version = Column(Integer, default=1, nullable=False)
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    project = relationship("Project", back_populates="reports")
 
 
 # Backward compatibility aliases

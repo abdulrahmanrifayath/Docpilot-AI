@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
@@ -49,6 +49,8 @@ from app.schemas.project import (
     GitHubStatusResponse,
     GitHubRefreshRequest,
     GitHubRefreshResponse,
+    ReportGenerateRequest,
+    TechnicalReportResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -887,10 +889,63 @@ async def refresh_project_github(
     )
 
 
+# -----------------------------------------------------------------------------
+# PHASE 16: TECHNICAL REPORTS AND DOCUMENTATION EXPORT ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@router.post("/{project_id}/reports/generate", response_model=TechnicalReportResponse, status_code=status.HTTP_201_CREATED)
+async def generate_project_technical_report(
+    project_id: str,
+    payload: Optional[ReportGenerateRequest] = None,
+    db: AsyncSession = Depends(get_db),
+) -> TechnicalReportResponse:
+    """
+    Generate an enterprise technical report or documentation export.
+    Supports: FULL_TECHNICAL_REPORT, README, API_DOCUMENTATION, ARCHITECTURE, DATABASE, ONBOARDING.
+    Explicitly tags: Detected information, AI-generated explanations, and Inferred relationships.
+    """
+    req = payload or ReportGenerateRequest()
+    return await project_service.generate_project_report(
+        project_id=project_id,
+        payload=req,
+        db=db,
+    )
 
 
+@router.get("/{project_id}/reports", response_model=List[TechnicalReportResponse])
+async def list_project_technical_reports(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> List[TechnicalReportResponse]:
+    """Retrieve all generated technical reports and documentation snapshots for a project."""
+    return await project_service.list_project_reports(
+        project_id=project_id,
+        db=db,
+    )
 
 
+@router.get("/{project_id}/reports/{report_id}/export")
+async def export_project_technical_report(
+    project_id: str,
+    report_id: str,
+    format: str = Query("markdown", description="Export format: markdown, html, pdf"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export a technical report in Markdown, HTML, or publication-ready PDF format.
+    Streams attachment with Content-Disposition header.
+    """
+    file_bytes, media_type, filename = await project_service.export_project_report(
+        project_id=project_id,
+        report_id=report_id,
+        format_type=format,
+        db=db,
+    )
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+    }
+    return Response(content=file_bytes, media_type=media_type, headers=headers)
 
 
 

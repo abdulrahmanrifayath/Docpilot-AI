@@ -739,10 +739,44 @@ class GitHubRefreshResponse(BaseModel):
     error_message: Optional[str] = None
 
 
+# =============================================================================
+# PHASE 16: TECHNICAL REPORTS AND DOCUMENTATION EXPORT SCHEMAS
+# =============================================================================
+
+class ReportSectionItem(BaseModel):
+    id: str
+    title: str
+    category: str = "detected"  # detected, ai_generated, inferred
+    category_label: str = "Detected from Repository Evidence"  # [Detected from Repository Evidence], [AI-Generated Architecture Explanation], [Inferred Relationship & Dependency Graph]
+    content: str
+    source_evidence: List[str] = Field(default_factory=list)
 
 
+class ReportGenerateRequest(BaseModel):
+    report_type: str = Field(
+        "FULL_TECHNICAL_REPORT",
+        description="Type of report: FULL_TECHNICAL_REPORT, README, API_DOCUMENTATION, ARCHITECTURE, DATABASE, ONBOARDING",
+    )
+    title: Optional[str] = Field(None, description="Optional custom title for the report")
+    custom_sections: Optional[List[str]] = Field(None, description="Optional list of section IDs to include")
+    force_regenerate: bool = Field(False, description="Whether to recompute report even if an existing version matches")
 
 
+class TechnicalReportResponse(BaseModel):
+    id: str
+    project_id: str
+    report_type: str
+    title: str
+    description: Optional[str] = None
+    sections: List[ReportSectionItem] = Field(default_factory=list)
+    markdown_content: str
+    html_content: Optional[str] = None
+    commit_sha: Optional[str] = None
+    version: int = 1
+    available_formats: List[str] = Field(default_factory=lambda: ["markdown", "html", "pdf"])
+    metadata: Dict[str, Any] = Field(default_factory=dict, validation_alias=AliasChoices("format_metadata", "metadata"))
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 
