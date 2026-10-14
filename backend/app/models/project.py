@@ -65,11 +65,13 @@ class Project(Base):
     knowledge_edges = relationship("KnowledgeEdge", back_populates="project", cascade="all, delete-orphan")
     sequence_diagrams = relationship("SequenceDiagram", back_populates="project", cascade="all, delete-orphan")
     onboarding_guide = relationship("OnboardingGuide", back_populates="project", uselist=False, cascade="all, delete-orphan")
+    change_records = relationship("ChangeRecord", back_populates="project", cascade="all, delete-orphan", order_by="desc(ChangeRecord.created_at)")
 
     # Convenient synonyms
     entities = synonym("code_entities")
     dependencies = synonym("dependency_relationships")
     sequences = synonym("sequence_diagrams")
+    changes = synonym("change_records")
 
 
 class CodeEntity(Base):
