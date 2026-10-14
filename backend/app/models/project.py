@@ -15,10 +15,25 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     source_type = Column(String(50), nullable=False, default="zip")  # zip, git, local
@@ -68,6 +83,7 @@ class Project(Base):
     onboarding_guide = relationship("OnboardingGuide", back_populates="project", uselist=False, cascade="all, delete-orphan")
     change_records = relationship("ChangeRecord", back_populates="project", cascade="all, delete-orphan", order_by="desc(ChangeRecord.created_at)")
     reports = relationship("TechnicalReport", back_populates="project", cascade="all, delete-orphan", order_by="desc(TechnicalReport.created_at)")
+    user = relationship("User", back_populates="projects")
 
     # Convenient synonyms
     entities = synonym("code_entities")
