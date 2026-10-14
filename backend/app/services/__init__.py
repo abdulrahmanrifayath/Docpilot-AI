@@ -5,6 +5,7 @@ from app.services.diagram_service import diagram_service, DiagramService, valida
 from app.services.sequence_service import sequence_service, SequenceService
 from app.services.indexer_service import project_indexer_service, ProjectIndexerService
 from app.services.onboarding_service import onboarding_service, OnboardingService
+from app.services.github_service import github_service, GitHubService
 
 __all__ = [
     "pipeline_service",
@@ -22,6 +23,8 @@ __all__ = [
     "ProjectIndexerService",
     "onboarding_service",
     "OnboardingService",
+    "github_service",
+    "GitHubService",
 ]
 
 
