@@ -73,6 +73,8 @@ class Settings(BaseSettings):
 
     # Vector Store
     VECTOR_STORE_TYPE: str = "local"
+    QDRANT_HOST: Optional[str] = "qdrant"
+    QDRANT_PORT: int = 6333
 
     # Integrations
     GITHUB_TOKEN: Optional[str] = None

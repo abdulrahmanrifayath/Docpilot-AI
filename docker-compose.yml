@@ -1,27 +1,142 @@
 version: '3.8'
 
 services:
-  docpilot-api:
+  # ===========================================================================
+  # PostgreSQL Relational Database Service
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: docpilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-docpilot}
+    ports:
+      - "5432:5432"
+    volumes:
+      - docpilot-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-docpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - docpilot-network
+
+  # ===========================================================================
+  # Vector Database Service (Qdrant)
+  # ===========================================================================
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: docpilot-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - docpilot-qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - docpilot-network
+
+  # ===========================================================================
+  # DocPilot AI Backend FastAPI Engine
+  # ===========================================================================
+  backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: docpilot-api
+    container_name: docpilot-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
+      - APP_NAME=DocPilot AI
       - APP_ENV=production
-      - DEBUG=False
-      - PORT=8000
+      - DEBUG=false
       - HOST=0.0.0.0
-      - DATABASE_URL=sqlite+aiosqlite:///./data/docpilot.db
-      - LLM_PROVIDER=openai
+      - PORT=8000
+      - API_V1_STR=/api/v1
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-docpilot}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-docpilot-production-secret-jwt-key-replace-in-env-32bytes}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      - CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000","http://localhost:80","http://localhost","http://frontend"]
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - LLM_MODEL=gpt-4o-mini
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - VECTOR_STORE_TYPE=${VECTOR_STORE_TYPE:-local}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - MAX_UPLOAD_SIZE_MB=100
+      - MAX_FILE_SIZE_BYTES=2097152
     volumes:
-      - docpilot-data:/app/backend/data
-      - docpilot-uploads:/app/backend/uploads
-    restart: unless-stopped
+      - docpilot-data:/app/data
+      - docpilot-uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - docpilot-network
 
+  # ===========================================================================
+  # DocPilot AI Frontend Nginx Web Application
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: docpilot-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - docpilot-network
+
+# =============================================================================
+# Persistent Data Volumes
+# =============================================================================
 volumes:
+  docpilot-pgdata:
+    driver: local
   docpilot-data:
+    driver: local
   docpilot-uploads:
+    driver: local
+  docpilot-qdrant:
+    driver: local
+
+# =============================================================================
+# Shared Application Network
+# =============================================================================
+networks:
+  docpilot-network:
+    driver: bridge
