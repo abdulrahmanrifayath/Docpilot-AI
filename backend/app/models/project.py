@@ -27,6 +27,8 @@ class Project(Base):
     status = Column(String(50), nullable=False, default="CREATED")  # CREATED, UPLOADING, CLONING, READY, ANALYZING, ANALYZED, FAILED
     error_message = Column(Text, nullable=True)
     last_analyzed_at = Column(DateTime, nullable=True)
+    last_commit_sha = Column(String(100), nullable=True)
+    sync_status = Column(String(50), nullable=True, default="SYNCED")  # SYNCED, OUT_OF_SYNC, SYNCING, FAILED
     current_step = Column(String(100), nullable=True, default="Created")
     progress_percent = Column(Integer, default=0)
 
