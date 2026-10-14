@@ -76,6 +76,7 @@ import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
 import { APIExplorer } from '../components/APIExplorer';
 import { DatabaseSchemaExplorer } from '../components/DatabaseSchemaExplorer';
 import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
+import { SequenceFlowExplorer } from '../components/SequenceFlowExplorer';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -1392,6 +1393,36 @@ export const ProjectDetailsPage: React.FC = () => {
         <ArchitectureExplorer
           projectId={project.id}
           projectName={project.name}
+        />
+      </div>
+
+      {/* SECTION 8: AUTOMATIC SEQUENCE FLOWS & EXECUTION DIAGRAMS (PHASE 11) */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Workflow className="w-4 h-4 text-emerald-400" />
+              <span>Automatic Sequence Diagrams & Execution Flows</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Probable runtime execution paths for login, registration, orders, and mutation flows synthesized via static AST analysis, dependencies, and database models.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/diagrams"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all border border-slate-700"
+            >
+              <span>Dedicated Sequence Canvas</span>
+              <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+
+        <SequenceFlowExplorer
+          projectId={project.id}
+          projectName={project.name}
+          onRefreshProject={() => loadAllData(project.id)}
         />
       </div>
     </div>

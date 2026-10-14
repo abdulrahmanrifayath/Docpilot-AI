@@ -29,10 +29,15 @@ import { DiagramItem, DependencyGraphResponse, ArchitectureDiagramType } from '.
 import { MermaidViewer } from '../components/MermaidViewer';
 import { DependencyGraphViewer } from '../components/DependencyGraphViewer';
 import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
+import { SequenceFlowExplorer } from '../components/SequenceFlowExplorer';
 
-export const DiagramsPage: React.FC = () => {
+interface DiagramsPageProps {
+  defaultTab?: string;
+}
+
+export const DiagramsPage: React.FC<DiagramsPageProps> = ({ defaultTab }) => {
   const { activeProject, projects, setActiveProject } = useProjects();
-  const [selectedType, setSelectedType] = useState<string>('SYSTEM_ARCHITECTURE');
+  const [selectedType, setSelectedType] = useState<string>(defaultTab || 'SYSTEM_ARCHITECTURE');
   const [diagrams, setDiagrams] = useState<DiagramItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
@@ -168,6 +173,12 @@ export const DiagramsPage: React.FC = () => {
       desc: 'Relational schema, tables, fields & cardinalities',
     },
     {
+      id: 'SEQUENCE_DIAGRAM',
+      name: 'Sequence Flows',
+      icon: Workflow,
+      desc: 'Automatic execution sequence diagrams for key application flows',
+    },
+    {
       id: 'interactive_flow',
       name: 'Interactive React Flow',
       icon: Workflow,
@@ -259,7 +270,7 @@ export const DiagramsPage: React.FC = () => {
       )}
 
       {/* Diagram Type Selector Navigation Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2.5">
         {diagramTabs.map((tab) => {
           const Icon = tab.icon;
           const isSelected = selectedType === tab.id;
@@ -310,7 +321,12 @@ export const DiagramsPage: React.FC = () => {
       </div>
 
       {/* Main Canvas Presentation View */}
-      {selectedType === 'unified' ? (
+      {selectedType === 'SEQUENCE_DIAGRAM' ? (
+        <SequenceFlowExplorer
+          projectId={activeProject.id}
+          projectName={activeProject.name}
+        />
+      ) : selectedType === 'unified' ? (
         <ArchitectureExplorer
           projectId={activeProject.id}
           projectName={activeProject.name}
