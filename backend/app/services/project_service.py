@@ -1648,6 +1648,44 @@ class ProjectService:
             force_regenerate=False,
         )
 
+    # -------------------------------------------------------------------------
+    # PHASE 14: CHANGE DETECTION & DOCUMENTATION SYNCHRONIZATION
+    # -------------------------------------------------------------------------
+
+    async def check_changes(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> ChangeCheckResponse:
+        await self.get_project(project_id, db)
+        return await sync_service.detect_changes(project_id, db)
+
+    async def get_change_history(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        limit: int = 10,
+    ) -> List[ChangeReportResponse]:
+        await self.get_project(project_id, db)
+        return await sync_service.get_change_history(project_id, db, limit=limit)
+
+    async def update_documentation_and_sync(
+        self,
+        project_id: str,
+        db: AsyncSession,
+        force_all: bool = False,
+        document_types: Optional[List[str]] = None,
+        regenerate_diagrams: bool = True,
+    ) -> ChangeReportResponse:
+        await self.get_project(project_id, db)
+        return await sync_service.update_documentation_and_sync(
+            project_id=project_id,
+            db=db,
+            force_all=force_all,
+            document_types=document_types,
+            regenerate_diagrams=regenerate_diagrams,
+        )
+
 
 project_service = ProjectService()
 
