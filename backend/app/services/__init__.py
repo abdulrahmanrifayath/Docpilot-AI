@@ -4,6 +4,7 @@ from app.services.documentation_service import documentation_service, Documentat
 from app.services.diagram_service import diagram_service, DiagramService, validate_mermaid_syntax
 from app.services.sequence_service import sequence_service, SequenceService
 from app.services.indexer_service import project_indexer_service, ProjectIndexerService
+from app.services.onboarding_service import onboarding_service, OnboardingService
 
 __all__ = [
     "pipeline_service",
@@ -19,6 +20,8 @@ __all__ = [
     "SequenceService",
     "project_indexer_service",
     "ProjectIndexerService",
+    "onboarding_service",
+    "OnboardingService",
 ]
 
 
