@@ -8,6 +8,7 @@ class ProjectCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=2000, description="Optional project description")
     source_type: str = Field("zip", description="Source type: 'zip', 'git', or 'local'")
     source_url: Optional[str] = Field(None, max_length=500, description="GitHub repository URL if source_type is 'git'")
+    branch: Optional[str] = Field("main", description="Tracking branch for Git repository")
 
     @field_validator("source_type")
     @classmethod
@@ -20,6 +21,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectCloneRequest(BaseModel):
     source_url: Optional[str] = Field(None, description="Public GitHub repository URL (e.g. https://github.com/owner/repo)")
+    branch: Optional[str] = Field("main", description="Branch to checkout and analyze")
 
 
 class ProjectResponse(BaseModel):
@@ -35,6 +37,7 @@ class ProjectResponse(BaseModel):
     error_message: Optional[str] = None
     last_analyzed_at: Optional[datetime] = None
     last_commit_sha: Optional[str] = None
+    branch: Optional[str] = "main"
     sync_status: Optional[str] = "SYNCED"
     languages: Dict[str, Any] = Field(default_factory=dict)
     frameworks: List[str] = Field(default_factory=list)
@@ -665,6 +668,76 @@ class ChangeUpdateRequest(BaseModel):
     force_all: bool = Field(False, description="Force re-sync of all documents regardless of detected change diff")
     document_types: Optional[List[str]] = Field(None, description="Specific document types to synchronize")
     regenerate_diagrams: bool = Field(True, description="Whether to update affected architecture diagrams")
+
+
+# =============================================================================
+# PHASE 15: GITHUB INTEGRATION SCHEMAS
+# =============================================================================
+
+class GitHubValidateRequest(BaseModel):
+    url: str = Field(..., min_length=3, description="GitHub repository URL (e.g. https://github.com/owner/repo or owner/repo)")
+    token: Optional[str] = Field(None, description="Optional GitHub personal access token (used in memory only, not stored in plain text)")
+    branch: Optional[str] = Field(None, description="Optional branch name to validate")
+
+
+class GitHubValidateResponse(BaseModel):
+    valid: bool = True
+    owner: str
+    repo: str
+    full_name: str
+    default_branch: str
+    branches: List[str] = Field(default_factory=list)
+    selected_branch: str
+    description: Optional[str] = None
+    stars_count: int = 0
+    forks_count: int = 0
+    open_issues_count: int = 0
+    is_private: bool = False
+    clone_url: str
+    language: Optional[str] = None
+    topics: List[str] = Field(default_factory=list)
+    size_kb: int = 0
+    latest_commit_sha: Optional[str] = None
+    rate_limit_remaining: Optional[int] = None
+    message: str = "Repository is valid and accessible"
+
+
+class GitHubStatusResponse(BaseModel):
+    project_id: str
+    is_github_repo: bool = True
+    repository_url: Optional[str] = None
+    owner: Optional[str] = None
+    repo_name: Optional[str] = None
+    current_branch: str = "main"
+    available_branches: List[str] = Field(default_factory=list)
+    local_commit_sha: Optional[str] = None
+    remote_commit_sha: Optional[str] = None
+    status: str = "UP_TO_DATE"  # UP_TO_DATE, BEHIND, AHEAD, DIVERGED, ERROR, NOT_A_GIT_REPO
+    commits_behind: int = 0
+    last_checked_at: Optional[datetime] = None
+    message: str = ""
+    error_message: Optional[str] = None
+
+
+class GitHubRefreshRequest(BaseModel):
+    branch: Optional[str] = Field(None, description="Optional branch to switch to or refresh")
+    force_sync: bool = Field(False, description="Force re-sync even if commit SHA hasn't changed")
+
+
+class GitHubRefreshResponse(BaseModel):
+    project_id: str
+    status: str = "REFRESHED"  # REFRESHED, UP_TO_DATE, FAILED
+    previous_commit_sha: Optional[str] = None
+    current_commit_sha: str
+    branch: str
+    new_commits_pulled: int = 0
+    files_changed: Dict[str, List[str]] = Field(default_factory=lambda: {"added": [], "modified": [], "deleted": []})
+    documentation_updated: List[Dict[str, Any]] = Field(default_factory=list)
+    diagrams_updated: List[Dict[str, Any]] = Field(default_factory=list)
+    refreshed_at: Optional[datetime] = None
+    message: str = ""
+    error_message: Optional[str] = None
+
 
 
 
