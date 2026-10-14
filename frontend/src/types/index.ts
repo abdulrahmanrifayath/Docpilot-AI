@@ -661,5 +661,44 @@ export interface ChatHistoryClearResponse {
   message: string;
 }
 
+// ============================================================================
+// Phase 13: Developer Onboarding Guide Types
+// ============================================================================
+
+export interface DetectedCommandItem {
+  command: string;
+  source_file: string;
+  description?: string;
+  verified: boolean;
+  category?: string;
+}
+
+export interface OnboardingSection {
+  key: string;
+  title: string;
+  content: string;
+  status: 'DETECTED' | 'PARTIAL' | 'NOT_DETECTED' | string;
+  detected_commands: DetectedCommandItem[];
+  is_missing: boolean;
+  order: number;
+}
+
+export interface OnboardingGenerateRequest {
+  force_regenerate?: boolean;
+}
+
+export interface OnboardingGuideResponse {
+  id: string;
+  project_id: string;
+  title: string;
+  markdown_content: string;
+  sections: OnboardingSection[];
+  detected_tools: string[];
+  missing_sections: string[];
+  version: number;
+  generated_at?: string;
+}
+
+
 
 

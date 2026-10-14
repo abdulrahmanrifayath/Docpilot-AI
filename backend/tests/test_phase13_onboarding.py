@@ -3,10 +3,12 @@ import zipfile
 import pytest
 from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.database.session import init_db
 
 
 @pytest.mark.asyncio
 async def test_phase13_developer_onboarding_guide_e2e():
+    await init_db()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1. Prepare Realistic Multi-Tier Project with Full Setup Evidence
