@@ -576,21 +576,6 @@ export async function regenerateProjectSequence(
 }
 
 
-export async function fetchChatHistory(projectId: string): Promise<ChatMessage[]> {
-  const res = await fetch(`${API_V1}/repositories/${projectId}/chat`);
-  if (!res.ok) return [];
-  return res.json();
-}
-
-export async function sendChatMessage(projectId: string, content: string): Promise<ChatMessage> {
-  const res = await fetch(`${API_V1}/repositories/${projectId}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  });
-  if (!res.ok) throw new Error('Failed to send message');
-  return res.json();
-}
 
 export async function fetchSettings(): Promise<ProviderSettings> {
   const res = await fetch(`${API_V1}/settings`);

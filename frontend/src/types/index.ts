@@ -450,14 +450,20 @@ export interface Citation {
   relevance?: number;
 }
 
+export type ChatCitation = Citation;
+
 export interface ChatMessage {
   id: string;
-  repository_id: string;
+  repository_id?: string;
   project_id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  sources: Citation[];
-  created_at: string;
+  sources?: Citation[];
+  confidence?: string | null;
+  intent?: string | null;
+  relevant_components?: string[];
+  metadata_json?: Record<string, any>;
+  created_at?: string;
 }
 
 export interface ProviderSettings {
@@ -647,28 +653,6 @@ export interface SequenceGenerateResponse {
 // ============================================================================
 // Phase 12: Repository-Aware AI Assistant Types
 // ============================================================================
-
-export interface ChatCitation {
-  file: string;
-  lines: string;
-  title: string;
-  type: 'file' | 'class' | 'function' | 'api' | 'model' | 'doc' | 'sequence' | 'code' | string;
-  relevance?: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  project_id?: string;
-  repository_id?: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  sources?: ChatCitation[];
-  confidence?: string | null;
-  intent?: string | null;
-  relevant_components?: string[];
-  metadata_json?: Record<string, any>;
-  created_at?: string;
-}
 
 export interface ChatHistoryClearResponse {
   status: string;
