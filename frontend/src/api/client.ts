@@ -43,6 +43,11 @@ import {
   ChangeCheckResponse,
   ChangeReportResponse,
   ChangeUpdateRequest,
+  GitHubValidateRequest,
+  GitHubValidateResponse,
+  GitHubStatusResponse,
+  GitHubRefreshRequest,
+  GitHubRefreshResponse,
 } from '../types';
 
 

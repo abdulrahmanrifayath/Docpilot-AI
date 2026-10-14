@@ -778,6 +778,79 @@ export interface ChangeUpdateRequest {
   regenerate_diagrams?: boolean;
 }
 
+// ============================================================================
+// Phase 15: GitHub Integration Types
+// ============================================================================
+
+export interface GitHubValidateRequest {
+  url: string;
+  token?: string;
+  branch?: string;
+}
+
+export interface GitHubValidateResponse {
+  valid: boolean;
+  owner: string;
+  repo: string;
+  full_name: string;
+  default_branch: string;
+  branches: string[];
+  selected_branch: string;
+  description?: string | null;
+  stars_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  is_private: boolean;
+  clone_url: string;
+  language?: string | null;
+  topics: string[];
+  size_kb: number;
+  latest_commit_sha?: string | null;
+  rate_limit_remaining?: number | null;
+  message: string;
+}
+
+export interface GitHubStatusResponse {
+  project_id: string;
+  is_github_repo: boolean;
+  repository_url?: string | null;
+  owner?: string | null;
+  repo_name?: string | null;
+  current_branch: string;
+  available_branches: string[];
+  local_commit_sha?: string | null;
+  remote_commit_sha?: string | null;
+  status: 'UP_TO_DATE' | 'BEHIND' | 'AHEAD' | 'DIVERGED' | 'ERROR' | 'NOT_A_GIT_REPO' | string;
+  commits_behind: number;
+  last_checked_at?: string | null;
+  message: string;
+  error_message?: string | null;
+}
+
+export interface GitHubRefreshRequest {
+  branch?: string;
+  force_sync?: boolean;
+}
+
+export interface GitHubRefreshResponse {
+  project_id: string;
+  status: 'REFRESHED' | 'UP_TO_DATE' | 'FAILED' | string;
+  previous_commit_sha?: string | null;
+  current_commit_sha: string;
+  branch: string;
+  new_commits_pulled: number;
+  files_changed: {
+    added: string[];
+    modified: string[];
+    deleted: string[];
+  };
+  documentation_updated: UpdatedDocumentItem[];
+  diagrams_updated: UpdatedDiagramItem[];
+  refreshed_at?: string | null;
+  message: string;
+  error_message?: string | null;
+}
+
 
 
 
