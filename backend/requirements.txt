@@ -18,3 +18,4 @@ reportlab>=4.0.0
 markdown>=3.5.0
 pyjwt>=2.8.0
 bcrypt>=4.1.0
+asyncpg>=0.29.0

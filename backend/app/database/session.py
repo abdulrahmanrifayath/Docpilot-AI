@@ -13,6 +13,10 @@ engine_args: Dict[str, Any] = {
 
 if "sqlite" in settings.DATABASE_URL:
     engine_args["connect_args"] = {"check_same_thread": False}
+else:
+    engine_args["pool_size"] = 10
+    engine_args["max_overflow"] = 20
+    engine_args["pool_pre_ping"] = True
 
 engine = create_async_engine(settings.DATABASE_URL, **engine_args)
 
@@ -43,6 +47,31 @@ async def init_db() -> None:
     import app.models.project  # noqa: F401 - Register all models with Base.metadata
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Ensure default demo user exists for legacy and unauthenticated projects
+        try:
+            from app.core.security import hash_password
+            u_check = await conn.execute(text("SELECT id FROM users WHERE email = 'demo@docpilot.ai'"))
+            demo_row = u_check.fetchone()
+            demo_id = "00000000-0000-0000-0000-000000000001"
+            if not demo_row:
+                now_val = datetime.now(timezone.utc)
+                demo_pw_hash = hash_password("password123")
+                await conn.execute(
+                    text("INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at) VALUES (:id, :email, :pw, :name, :now, :now)"),
+                    {"id": demo_id, "email": "demo@docpilot.ai", "pw": demo_pw_hash, "name": "Demo Developer", "now": now_val}
+                )
+            else:
+                demo_id = demo_row[0]
+
+            # Backfill any null user_id projects
+            await conn.execute(
+                text("UPDATE projects SET user_id = :demo_id WHERE user_id IS NULL"),
+                {"demo_id": demo_id}
+            )
+        except Exception:
+            pass
+
         if "sqlite" in settings.DATABASE_URL:
             try:
                 res = await conn.execute(text("PRAGMA table_info(projects)"))
@@ -57,27 +86,6 @@ async def init_db() -> None:
                     await conn.execute(text("ALTER TABLE projects ADD COLUMN sync_status VARCHAR(50) DEFAULT 'SYNCED'"))
                 if "user_id" not in existing_cols and "id" in existing_cols:
                     await conn.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(36)"))
-
-                # Ensure default demo user exists for legacy and unauthenticated projects
-                from app.core.security import hash_password
-                u_check = await conn.execute(text("SELECT id FROM users WHERE email = 'demo@docpilot.ai'"))
-                demo_row = u_check.fetchone()
-                demo_id = "00000000-0000-0000-0000-000000000001"
-                if not demo_row:
-                    now_str = datetime.now(timezone.utc).isoformat()
-                    demo_pw_hash = hash_password("password123")
-                    await conn.execute(
-                        text("INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at) VALUES (:id, :email, :pw, :name, :now, :now)"),
-                        {"id": demo_id, "email": "demo@docpilot.ai", "pw": demo_pw_hash, "name": "Demo Developer", "now": now_str}
-                    )
-                else:
-                    demo_id = demo_row[0]
-
-                # Backfill any null user_id projects
-                await conn.execute(
-                    text("UPDATE projects SET user_id = :demo_id WHERE user_id IS NULL"),
-                    {"demo_id": demo_id}
-                )
 
                 # Documents table Phase 9 columns migration
                 d_res = await conn.execute(text("PRAGMA table_info(documents)"))
