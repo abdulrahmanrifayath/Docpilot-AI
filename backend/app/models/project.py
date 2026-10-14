@@ -359,5 +359,49 @@ class OnboardingGuide(Base):
     project = relationship("Project", back_populates="onboarding_guide")
 
 
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    document_id = Column(String(36), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    document_type = Column(String(50), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    target_path = Column(String(500), nullable=True)
+    commit_sha = Column(String(100), nullable=True)
+    metadata_json = Column("metadata", JSON, default=dict)
+
+    archived_at = Column(DateTime, default=utc_now)
+
+    document = relationship("Document", back_populates="history_versions")
+
+
+class ChangeRecord(Base):
+    __tablename__ = "project_change_records"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    previous_commit_sha = Column(String(100), nullable=True)
+    current_commit_sha = Column(String(100), nullable=True)
+    total_files_changed = Column(Integer, default=0)
+    files_added = Column(JSON, default=list)
+    files_modified = Column(JSON, default=list)
+    files_deleted = Column(JSON, default=list)
+    entities_affected = Column(JSON, default=list)
+    apis_affected = Column(JSON, default=list)
+    db_models_affected = Column(JSON, default=list)
+    documentation_updated = Column(JSON, default=list)
+    diagrams_updated = Column(JSON, default=list)
+    status = Column(String(50), default="SYNCED", index=True)  # SYNCED, NO_CHANGES, FAILED, DETECTED
+    error_message = Column(Text, nullable=True)
+    details_json = Column("details", JSON, default=dict)
+
+    created_at = Column(DateTime, default=utc_now)
+
+    project = relationship("Project", back_populates="change_records")
+
+
 # Backward compatibility aliases
 Repository = Project
