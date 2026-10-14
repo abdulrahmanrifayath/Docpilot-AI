@@ -75,6 +75,16 @@ async def init_db() -> None:
                     await conn.execute(text("ALTER TABLE diagrams ADD COLUMN version INTEGER DEFAULT 1"))
                 if "metadata" not in diag_cols and "id" in diag_cols:
                     await conn.execute(text("ALTER TABLE diagrams ADD COLUMN metadata JSON DEFAULT '{}'"))
+
+                # Chat Messages table Phase 12 columns migration
+                c_res = await conn.execute(text("PRAGMA table_info(chat_messages)"))
+                c_cols = {row[1] for row in c_res.fetchall()}
+                if "confidence" not in c_cols and "id" in c_cols:
+                    await conn.execute(text("ALTER TABLE chat_messages ADD COLUMN confidence VARCHAR(200)"))
+                if "intent" not in c_cols and "id" in c_cols:
+                    await conn.execute(text("ALTER TABLE chat_messages ADD COLUMN intent VARCHAR(50)"))
+                if "relevant_components" not in c_cols and "id" in c_cols:
+                    await conn.execute(text("ALTER TABLE chat_messages ADD COLUMN relevant_components JSON DEFAULT '[]'"))
             except Exception:
                 pass
 

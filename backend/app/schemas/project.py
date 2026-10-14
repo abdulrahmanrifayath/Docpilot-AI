@@ -513,6 +513,43 @@ class SequenceGenerateResponse(BaseModel):
     message: Optional[str] = None
 
 
+# =============================================================================
+# PHASE 12: REPOSITORY-AWARE AI ASSISTANT SCHEMAS
+# =============================================================================
+
+class CitationItem(BaseModel):
+    file: str
+    lines: str
+    title: str
+    type: str = "code"
+    relevance: Optional[float] = None
+
+
+class ChatMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, description="User question or prompt about the repository")
+
+
+class ChatMessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    project_id: str = Field(..., validation_alias=AliasChoices("project_id", "repository_id"))
+    role: str = "assistant"
+    content: str
+    sources: List[CitationItem] = Field(default_factory=list)
+    confidence: Optional[str] = None
+    intent: Optional[str] = None
+    relevant_components: List[str] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+
+
+class ChatHistoryClearResponse(BaseModel):
+    status: str = "cleared"
+    project_id: str
+    deleted_count: int = 0
+
+
+
 
 
 

@@ -84,6 +84,9 @@ class ChatMessageResponse(BaseModel):
     role: str
     content: str
     sources: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence: Optional[str] = None
+    intent: Optional[str] = None
+    relevant_components: List[str] = Field(default_factory=list)
     created_at: datetime
 
 

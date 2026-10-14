@@ -44,21 +44,35 @@ async def send_chat_message(
     await db.commit()
 
     # Query RAG chat service
-    answer, citations = await chat_service.ask(
+    chat_resp = await chat_service.ask(
         query=payload.content,
-        repository_id=repository_id,
-        repo_name=repo.name,
+        project_id=repository_id,
+        project_name=repo.name,
+        db=db,
     )
 
     # Record assistant message
     asst_msg = ChatMessage(
         repository_id=repository_id,
         role="assistant",
-        content=answer,
-        sources=citations,
+        content=chat_resp.answer,
+        sources=chat_resp.citations,
+        confidence=chat_resp.confidence,
+        intent=chat_resp.intent,
+        relevant_components=chat_resp.relevant_components,
     )
     db.add(asst_msg)
     await db.commit()
     await db.refresh(asst_msg)
 
     return asst_msg
+
+
+@router.delete("/{repository_id}/chat")
+async def clear_chat_history(repository_id: str, db: AsyncSession = Depends(get_db)):
+    """Clear chat history for a repository."""
+    from sqlalchemy import delete
+    result = await db.execute(delete(ChatMessage).where(ChatMessage.repository_id == repository_id))
+    await db.commit()
+    return {"status": "cleared", "repository_id": repository_id, "deleted_count": result.rowcount if hasattr(result, "rowcount") else 0}
+

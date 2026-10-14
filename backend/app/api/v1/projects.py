@@ -38,6 +38,9 @@ from app.schemas.project import (
     SequenceGenerateRequest,
     SequenceDiagramResponse,
     SequenceGenerateResponse,
+    ChatMessageCreate,
+    ChatMessageResponse,
+    ChatHistoryClearResponse,
 )
 from app.ai.llm_client import LLMNotConfiguredError
 from app.services.project_service import project_service
@@ -692,6 +695,49 @@ async def regenerate_project_sequence(
         )
     except ValueError as ex:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ex))
+
+
+# -----------------------------------------------------------------------------
+# PHASE 12: REPOSITORY-AWARE AI ASSISTANT ENDPOINTS
+# -----------------------------------------------------------------------------
+
+@router.post("/{project_id}/chat", response_model=ChatMessageResponse)
+async def send_project_chat_message(
+    project_id: str,
+    payload: ChatMessageCreate,
+    db: AsyncSession = Depends(get_db),
+) -> ChatMessageResponse:
+    """Ask a question about an analyzed repository using repository-aware RAG."""
+    return await project_service.send_chat_message(
+        project_id=project_id,
+        content=payload.content,
+        db=db,
+    )
+
+
+@router.get("/{project_id}/chat/history", response_model=List[ChatMessageResponse])
+async def get_project_chat_history(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> List[ChatMessageResponse]:
+    """Retrieve complete chat history for a project."""
+    return await project_service.get_chat_history(
+        project_id=project_id,
+        db=db,
+    )
+
+
+@router.delete("/{project_id}/chat/history", response_model=ChatHistoryClearResponse)
+async def clear_project_chat_history(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ChatHistoryClearResponse:
+    """Clear conversation history for a project."""
+    return await project_service.clear_chat_history(
+        project_id=project_id,
+        db=db,
+    )
+
 
 
 

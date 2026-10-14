@@ -30,6 +30,7 @@ from app.models.project import (
     DatabaseField,
     DatabaseRelationship,
     Diagram,
+    ChatMessage,
     utc_now,
 )
 from app.parsers.code_extractor import code_parsing_engine
@@ -68,11 +69,14 @@ from app.schemas.project import (
     DiagramGenerateResponse,
     SequenceDiagramResponse,
     SequenceGenerateResponse,
+    ChatMessageResponse,
+    ChatHistoryClearResponse,
 )
 from app.services.documentation_service import documentation_service
 from app.services.diagram_service import diagram_service
 from app.services.sequence_service import sequence_service
 from app.services.repository_scanner import repository_scanner
+from app.ai.chat_service import chat_service
 
 
 
@@ -1524,6 +1528,89 @@ class ProjectService:
             project_id=project_id,
             sequence_id=sequence_id,
             db=db,
+        )
+
+    # -------------------------------------------------------------------------
+    # Phase 12: Repository-Aware AI Assistant
+    # -------------------------------------------------------------------------
+    async def send_chat_message(
+        self,
+        project_id: str,
+        content: str,
+        db: AsyncSession,
+    ) -> ChatMessageResponse:
+        project = await self.get_project(project_id, db)
+        clean_content = content.strip()
+        if not clean_content:
+            raise ValidationException(message="Message content cannot be empty")
+
+        # 1. Record user message
+        user_msg = ChatMessage(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            role="user",
+            content=clean_content,
+            sources=[],
+            created_at=utc_now(),
+        )
+        db.add(user_msg)
+        await db.commit()
+
+        # 2. Query Repository-Aware RAG Engine
+        chat_resp = await chat_service.ask(
+            query=clean_content,
+            project_id=project_id,
+            project_name=project.name,
+            db=db,
+        )
+
+        # 3. Record assistant message
+        asst_msg = ChatMessage(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            role="assistant",
+            content=chat_resp.answer,
+            sources=chat_resp.citations,
+            confidence=chat_resp.confidence,
+            intent=chat_resp.intent,
+            relevant_components=chat_resp.relevant_components,
+            created_at=utc_now(),
+        )
+        db.add(asst_msg)
+        await db.commit()
+        await db.refresh(asst_msg)
+
+        return ChatMessageResponse.model_validate(asst_msg)
+
+    async def get_chat_history(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> List[ChatMessageResponse]:
+        await self.get_project(project_id, db)
+        stmt = (
+            select(ChatMessage)
+            .where(ChatMessage.project_id == project_id)
+            .order_by(ChatMessage.created_at.asc())
+        )
+        res = await db.execute(stmt)
+        messages = res.scalars().all()
+        return [ChatMessageResponse.model_validate(m) for m in messages]
+
+    async def clear_chat_history(
+        self,
+        project_id: str,
+        db: AsyncSession,
+    ) -> ChatHistoryClearResponse:
+        await self.get_project(project_id, db)
+        stmt = delete(ChatMessage).where(ChatMessage.project_id == project_id)
+        result = await db.execute(stmt)
+        await db.commit()
+        deleted_count = result.rowcount if hasattr(result, "rowcount") else 0
+        return ChatHistoryClearResponse(
+            status="cleared",
+            project_id=project_id,
+            deleted_count=deleted_count,
         )
 
 

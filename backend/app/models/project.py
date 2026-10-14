@@ -319,11 +319,14 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     repository_id = synonym("project_id")
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
     sources = Column(JSON, default=list)
+    confidence = Column(String(200), nullable=True)
+    intent = Column(String(50), nullable=True)
+    relevant_components = Column(JSON, default=list)
     
     created_at = Column(DateTime, default=utc_now)
 
