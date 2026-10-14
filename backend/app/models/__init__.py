@@ -1,4 +1,5 @@
 from app.models.project import (
+    User,
     Project,
     Document,
     Diagram,
@@ -16,6 +17,7 @@ from app.models.project import (
 )
 
 __all__ = [
+    "User",
     "Project",
     "Document",
     "Diagram",
