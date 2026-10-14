@@ -326,6 +326,15 @@ export const DocumentationPage: React.FC = () => {
             </button>
           )}
 
+          <Link
+            to={`/projects/${activeProject.id}#reports-export-section`}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold border border-indigo-500/30 transition-all"
+            title="Open Technical Reports & Multi-Format Export Center (PDF, HTML, MD)"
+          >
+            <FileDown className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Reports & PDF Export</span>
+          </Link>
+
           <button
             onClick={handleGenerateAll}
             disabled={generating}

@@ -39,6 +39,7 @@ import {
   Network,
   Database,
   Compass,
+  FileDown,
 } from 'lucide-react';
 import {
   Project,
@@ -79,6 +80,7 @@ import { DatabaseSchemaExplorer } from '../components/DatabaseSchemaExplorer';
 import { ArchitectureExplorer } from '../components/ArchitectureExplorer';
 import { SequenceFlowExplorer } from '../components/SequenceFlowExplorer';
 import { SyncManager } from '../components/SyncManager';
+import { ReportsExportCenter } from '../components/ReportsExportCenter';
 import { useProjects } from '../context/ProjectContext';
 
 
@@ -726,6 +728,16 @@ export const ProjectDetailsPage: React.FC = () => {
             <Compass className="w-3.5 h-3.5" />
             <span>Onboarding Guide</span>
           </Link>
+
+          {/* Reports & Export Shortcut */}
+          <a
+            href="#reports-export-section"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600/20 text-brand-300 border border-brand-500/30 hover:bg-brand-600/30 shadow-md transition-all"
+            title="Generate and export technical reports in Markdown, HTML, and PDF"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Reports & Exports</span>
+          </a>
 
           <button
             onClick={() => id && loadAllData(id)}
@@ -1464,6 +1476,11 @@ export const ProjectDetailsPage: React.FC = () => {
           projectName={project.name}
           onRefreshProject={() => loadAllData(project.id)}
         />
+      </div>
+
+      {/* SECTION 9: TECHNICAL REPORTS & DOCUMENTATION EXPORT (PHASE 16) */}
+      <div id="reports-export-section">
+        <ReportsExportCenter project={project} />
       </div>
     </div>
   );
