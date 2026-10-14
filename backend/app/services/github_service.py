@@ -384,7 +384,12 @@ class GitHubService:
 
         git_repo = Repo(str(repo_path))
         previous_commit_sha = project.last_commit_sha or git_repo.head.commit.hexsha
-        target_branch = (branch or project.branch or "main").strip()
+        if branch and branch.strip():
+            target_branch = branch.strip()
+        elif not git_repo.head.is_detached:
+            target_branch = git_repo.active_branch.name
+        else:
+            target_branch = project.branch or "main"
 
         try:
             origin = git_repo.remotes.origin
