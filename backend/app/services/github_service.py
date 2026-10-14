@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from git import Repo, GitCommandError
 import httpx
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlparse
 from app.core.config import settings
 from app.core.exceptions import (
@@ -67,11 +68,26 @@ class GitHubService:
             repo = repo.removesuffix(".git")
             return owner, repo
 
-        # 2. HTTP/HTTPS or SSH format
-        url_match = re.search(r"github\.com[/:]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$", raw_url)
-        if url_match:
-            owner, repo = url_match.groups()
-            return owner, repo
+        # 2. Strict HTTP/HTTPS validation
+        if raw_url.startswith(("http://", "https://")):
+            parsed = urlparse(raw_url)
+            if parsed.netloc.lower() not in ("github.com", "www.github.com"):
+                raise ValidationException(
+                    message=f"Invalid GitHub repository URL: '{url}'. Domain must be github.com.",
+                    details={"provided_url": url},
+                )
+            parts = [p for p in parsed.path.strip("/").split("/") if p]
+            if len(parts) >= 2:
+                owner = parts[0]
+                repo = parts[1].removesuffix(".git")
+                return owner, repo
+
+        # 3. SSH format: git@github.com:owner/repo.git
+        if raw_url.startswith("git@"):
+            ssh_match = re.match(r"^git@github\.com[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$", raw_url)
+            if ssh_match:
+                owner, repo = ssh_match.groups()
+                return owner, repo
 
         raise ValidationException(
             message=f"Invalid GitHub repository URL: '{url}'. Format must be https://github.com/owner/repository or owner/repository.",
