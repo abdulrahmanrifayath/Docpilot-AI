@@ -779,11 +779,74 @@ export async function updateProjectDocumentation(
     const errorData = await res.json().catch(() => ({}));
     throw new Error(
       errorData.detail?.message ||
+        errorData.error?.message ||
         errorData.detail ||
         'Failed to synchronize documentation'
     );
   }
   return res.json();
 }
+
+// ============================================================================
+// Phase 15: GitHub Integration API Endpoints
+// ============================================================================
+
+export async function validateGitHubRepo(
+  payload: GitHubValidateRequest
+): Promise<GitHubValidateResponse> {
+  const res = await fetch(`${API_V1}/github/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message ||
+        err.detail?.message ||
+        err.detail ||
+        'Failed to validate GitHub repository'
+    );
+  }
+  return res.json();
+}
+
+export async function fetchGitHubStatus(
+  projectId: string
+): Promise<GitHubStatusResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/github/status`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message ||
+        err.detail?.message ||
+        err.detail ||
+        'Failed to fetch GitHub status'
+    );
+  }
+  return res.json();
+}
+
+export async function refreshGitHubRepo(
+  projectId: string,
+  payload?: GitHubRefreshRequest
+): Promise<GitHubRefreshResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/github/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message ||
+        err.detail?.message ||
+        err.detail ||
+        'Failed to refresh repository from GitHub'
+    );
+  }
+  return res.json();
+}
+
 
 
