@@ -591,6 +591,83 @@ class OnboardingGuideResponse(BaseModel):
     generated_at: Optional[datetime] = None
 
 
+# =============================================================================
+# PHASE 14: CHANGE DETECTION AND DOCUMENTATION SYNCHRONIZATION SCHEMAS
+# =============================================================================
+
+class ChangeCheckResponse(BaseModel):
+    project_id: str
+    has_changes: bool
+    previous_commit_sha: Optional[str] = None
+    current_commit_sha: Optional[str] = None
+    files_added: List[str] = Field(default_factory=list)
+    files_modified: List[str] = Field(default_factory=list)
+    files_deleted: List[str] = Field(default_factory=list)
+    total_files_changed: int = 0
+    affected_entities: List[str] = Field(default_factory=list)
+    affected_apis: List[str] = Field(default_factory=list)
+    affected_db_models: List[str] = Field(default_factory=list)
+    affected_documents: List[str] = Field(default_factory=list)
+    affected_diagrams: List[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class DocumentVersionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    version: int
+    document_type: str
+    title: str
+    target_path: Optional[str] = None
+    commit_sha: Optional[str] = None
+    archived_at: Optional[datetime] = None
+
+
+class UpdatedDocumentItem(BaseModel):
+    document_id: str
+    title: str
+    document_type: str
+    target_path: Optional[str] = None
+    version: int
+    previous_version: Optional[int] = None
+
+
+class UpdatedDiagramItem(BaseModel):
+    diagram_id: str
+    title: str
+    diagram_type: str
+    version: int
+
+
+class ChangeReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    project_id: str
+    status: str = "SYNCED"  # SYNCED, NO_CHANGES, FAILED
+    previous_commit_sha: Optional[str] = None
+    current_commit_sha: Optional[str] = None
+    files_changed: Dict[str, List[str]] = Field(default_factory=lambda: {"added": [], "modified": [], "deleted": []})
+    total_files_changed: int = 0
+    entities_affected: List[str] = Field(default_factory=list)
+    apis_affected: List[str] = Field(default_factory=list)
+    db_models_affected: List[str] = Field(default_factory=list)
+    documentation_updated: List[UpdatedDocumentItem] = Field(default_factory=list)
+    diagrams_updated: List[UpdatedDiagramItem] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
+    message: str = ""
+    error_message: Optional[str] = None
+
+
+class ChangeUpdateRequest(BaseModel):
+    force_all: bool = Field(False, description="Force re-sync of all documents regardless of detected change diff")
+    document_types: Optional[List[str]] = Field(None, description="Specific document types to synchronize")
+    regenerate_diagrams: bool = Field(True, description="Whether to update affected architecture diagrams")
+
+
+
 
 
 
