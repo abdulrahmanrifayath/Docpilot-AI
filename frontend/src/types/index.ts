@@ -18,6 +18,7 @@ export interface Project {
   error_message?: string;
   last_analyzed_at?: string;
   last_commit_sha?: string;
+  branch?: string;
   sync_status?: 'SYNCED' | 'OUT_OF_SYNC' | 'SYNCING' | 'FAILED' | string;
   languages?: Record<string, { files: number; lines: number; percent?: number }>;
   frameworks?: string[];
