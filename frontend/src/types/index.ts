@@ -852,6 +852,51 @@ export interface GitHubRefreshResponse {
   error_message?: string | null;
 }
 
+// ============================================================================
+// Phase 16: Technical Reports and Documentation Export Types
+// ============================================================================
+
+export type ReportType =
+  | 'FULL_TECHNICAL_REPORT'
+  | 'README'
+  | 'API_DOCUMENTATION'
+  | 'ARCHITECTURE'
+  | 'DATABASE'
+  | 'ONBOARDING';
+
+export interface ReportSectionItem {
+  id: string;
+  title: string;
+  category: 'detected' | 'ai_generated' | 'inferred' | string;
+  category_label: string;
+  content: string;
+  source_evidence?: string[];
+}
+
+export interface ReportGenerateRequest {
+  report_type?: ReportType | string;
+  title?: string;
+  custom_sections?: string[];
+  force_regenerate?: boolean;
+}
+
+export interface TechnicalReportResponse {
+  id: string;
+  project_id: string;
+  report_type: ReportType | string;
+  title: string;
+  description?: string | null;
+  sections: ReportSectionItem[];
+  markdown_content: string;
+  html_content?: string | null;
+  commit_sha?: string | null;
+  version: number;
+  available_formats: string[];
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at?: string | null;
+}
+
 
 
 

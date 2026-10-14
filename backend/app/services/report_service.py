@@ -239,10 +239,14 @@ class ReportService:
         Returns: (file_bytes, media_type, filename)
         """
         report = await self.get_report(project_id, report_id, db)
-        project = report.project
+        p_res = await db.execute(select(Project).where(Project.id == project_id))
+        project = p_res.scalars().first()
         if not project:
-            res = await db.execute(select(Project).where(Project.id == project_id))
-            project = res.scalars().first()
+            raise EntityNotFoundException(
+                entity_type="Project",
+                entity_id=project_id,
+                message=f"Project with ID '{project_id}' not found",
+            )
 
         clean_title = re.sub(r"[^A-Za-z0-9_-]+", "_", report.title.lower()).strip("_")
         base_name = f"{clean_title}_{report.id[:8]}"

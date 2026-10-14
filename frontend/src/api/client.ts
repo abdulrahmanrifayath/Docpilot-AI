@@ -48,6 +48,8 @@ import {
   GitHubStatusResponse,
   GitHubRefreshRequest,
   GitHubRefreshResponse,
+  ReportGenerateRequest,
+  TechnicalReportResponse,
 } from '../types';
 
 
@@ -847,6 +849,76 @@ export async function refreshGitHubRepo(
   }
   return res.json();
 }
+
+// ============================================================================
+// Phase 16: Technical Reports & Documentation Export Endpoints
+// ============================================================================
+
+export async function generateProjectReport(
+  projectId: string,
+  payload?: ReportGenerateRequest
+): Promise<TechnicalReportResponse> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/reports/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message ||
+        err.detail?.message ||
+        err.detail ||
+        'Failed to generate technical report'
+    );
+  }
+  return res.json();
+}
+
+export async function fetchProjectReports(
+  projectId: string
+): Promise<TechnicalReportResponse[]> {
+  const res = await fetch(`${API_V1}/projects/${projectId}/reports`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export function getReportExportUrl(
+  projectId: string,
+  reportId: string,
+  format: 'markdown' | 'html' | 'pdf' = 'markdown'
+): string {
+  return `${API_V1}/projects/${projectId}/reports/${reportId}/export?format=${format}`;
+}
+
+export async function downloadProjectReport(
+  projectId: string,
+  reportId: string,
+  format: 'markdown' | 'html' | 'pdf' = 'markdown',
+  filename?: string
+): Promise<void> {
+  const url = getReportExportUrl(projectId, reportId, format);
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.error?.message ||
+        err.detail?.message ||
+        err.detail ||
+        `Failed to export report as ${format}`
+    );
+  }
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename || `report_${reportId.slice(0, 8)}.${format === 'markdown' ? 'md' : format}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(blobUrl);
+}
+
 
 
 

@@ -152,6 +152,9 @@ class APIEndpoint(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
+    http_method = synonym("method")
+    handler_function = synonym("handler_name")
+
     project = relationship("Project", back_populates="api_endpoints")
 
 

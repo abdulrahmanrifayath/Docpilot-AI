@@ -19,12 +19,22 @@ class DocPilotException(Exception):
 
 
 class EntityNotFoundException(DocPilotException):
-    def __init__(self, entity_name: str, entity_id: str) -> None:
+    def __init__(
+        self,
+        entity_name: str = "Entity",
+        entity_id: str = "",
+        message: Optional[str] = None,
+        entity_type: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        name = entity_type or entity_name
+        msg = message or f"{name} with ID '{entity_id}' was not found."
+        det = details or {"entity_name": name, "entity_id": entity_id}
         super().__init__(
-            message=f"{entity_name} with ID '{entity_id}' was not found.",
+            message=msg,
             code="NOT_FOUND",
             status_code=404,
-            details={"entity_name": entity_name, "entity_id": entity_id},
+            details=det,
         )
 
 
